@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+*.db
+*.sqlite3
+.DS_Store
+dist/
+build/
+*.egg-info/
+# agent runtime artifacts
+redtape_data/
+mockgov_data/
+evals/reports/

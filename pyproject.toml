@@ -1,0 +1,32 @@
+[project]
+name = "redtape-agent"
+version = "0.1.0"
+description = "Autonomous cross-border document-renewal agent built with Strands Agents SDK"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "strands-agents>=1.55.0",
+    "strands-agents-tools>=0.2.0",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "jinja2>=3.1",
+    "pypdf>=5.0",
+    "reportlab>=4.2",
+    "python-dateutil>=2.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+agentcore = [
+    "bedrock-agentcore",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["redtape*", "mockgov*"]
