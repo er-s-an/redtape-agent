@@ -48,6 +48,13 @@ def test_license_window_not_open_yet():
     assert plan.steps[0].action == "prepare"
 
 
+def test_plan_steps_json_serializable():
+    import json
+    from redtape.tools import _step_dict
+    plan = plan_for_travel(TRAVEL, PASSPORT, PASSPORT_RULE, TODAY)
+    json.dumps([_step_dict(s) for s in plan.steps])
+
+
 def test_store_decision_flow_and_ledger_integrity(tmp_path):
     store = Store(tmp_path / "t.db")
     doc_id = store.add_document({"doc_type": "passport", "jurisdiction": "cn-consulate-sf",

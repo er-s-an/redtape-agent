@@ -127,6 +127,14 @@ def list_slots(office: str, service: str, after: str | None = None) -> list[dict
     ]
 
 
+@app.get("/api/slots/{slot_id}")
+def get_slot(slot_id: str) -> dict:
+    slot = _SLOTS.get(slot_id)
+    if slot is None:
+        raise HTTPException(404, "unknown slot")
+    return {"slot_id": slot_id, **slot}
+
+
 @app.post("/api/bookings", status_code=201)
 def book(req: BookingRequest) -> dict:
     with _lock:

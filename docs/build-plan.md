@@ -11,12 +11,15 @@ Deadline math: submission closes **Sep 14, 2026 5:00pm PT = Sep 15 08:00 Beijing
 ## Workstreams & milestones
 
 ### Day 1 — Fri Sep 11: skeleton + the loop walks
-- [x] Repo scaffold, docs, license (Apache-2.0), git init
-- [ ] **P0** `mockgov/`: FastAPI sandbox — appointment slots, booking, form submission endpoint; deterministic seed data
-- [ ] **P0** Core domain model: document records, dependency graph (SQLite), backward deadline computation
-- [ ] **P0** Agent core: `Agent` + system prompt + first tools (`graph_query`, `graph_update`, `book_appointment`, `calendar_hold`, `request_decision`, `log_action`)
-- [ ] **P0** Background daemon loop: wake → scan → act → sleep; ledger writes every action
-- [ ] **P1** `SnapshotSessionManager` wired in
+- [x] Repo scaffold, docs, license (Apache-2.0→MIT), git init
+- [x] **P0** `mockgov/`: FastAPI sandbox — appointment slots, booking, form submission endpoint; deterministic seed data
+- [x] **P0** Core domain model: document records, dependency graph (SQLite), backward deadline computation
+- [x] **P0** Agent core: `Agent` + system prompt + tools (`list_documents`, `check_rule`, `compute_renewal_plan`, `check_appointment_slots`, `book_appointment`, `create_calendar_hold`, `draft_form_prefill`, `request_human_decision`, `notify_user`, `submit_application`)
+- [x] **P0** Background daemon loop: wake → scan → act → sleep; ledger writes every action
+- [x] **P0** Hooks plugin: booking guard (slot ≤ graph-computed deadline) + submission guard (human-approved decisions only)
+- [x] **P1** `SnapshotSessionManager` wired in
+- [x] **P1** Steering: `LLMSteeringHandler` buddy with operating rules
+- [x] First full end-to-end wake verified (book S-1003, prefill draft, 3 calendar holds, valid hash chain)
 
 ### Day 2 — Sat Sep 12: real documents + guardrails
 - [ ] **P0** Document intake: extract expiry/fields from uploaded PDF/image (vision call) → verified document store
