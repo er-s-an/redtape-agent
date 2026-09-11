@@ -32,3 +32,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["redtape*", "mockgov*"]
+
+[tool.setuptools.package-data]
+redtape = ["static/*.html", "static/*.css", "static/*.js"]

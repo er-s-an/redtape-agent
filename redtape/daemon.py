@@ -13,6 +13,7 @@ from datetime import date
 from pathlib import Path
 
 from .agent import build_agent
+from .clock import today as clock_today
 from .paths import DATA_DIR
 from .store import Store
 from .tools import init_context
@@ -133,7 +134,7 @@ def main() -> None:
     parser.add_argument("--today", default=None, help="ISO date override for demos")
     args = parser.parse_args()
 
-    today = date.fromisoformat(args.today) if args.today else date.today()
+    today = date.fromisoformat(args.today) if args.today else clock_today()
     store = Store(DATA_DIR / "redtape.db")
     init_context(store, MOCKGOV_BASE, today, DATA_DIR)
     agent = build_agent(DATA_DIR)

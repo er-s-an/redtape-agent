@@ -89,6 +89,7 @@ class Store:
             self.conn.commit()
             self.log("human" if doc.get("confirmed") else "agent", "document_added",
                      {"doc_id": cur.lastrowid, "doc_type": doc["doc_type"]})
+            assert cur.lastrowid is not None
             return cur.lastrowid
 
     def list_documents(self) -> list[dict[str, Any]]:
@@ -103,6 +104,30 @@ class Store:
             ).fetchone()
             return self._row(row, json_cols=("fields",)) if row else None
 
+    def confirm_document(self, doc_id: int) -> None:
+        with self._lock:
+            self.conn.execute("UPDATE documents SET confirmed = 1 WHERE id = ?", (doc_id,))
+            self.conn.commit()
+            self.log("human", "document_confirmed", {"doc_id": doc_id})
+
+    def delete_document(self, doc_id: int) -> None:
+        """Remove a document; also removes the raw uploaded file when the row
+        carries one (photo intake retention)."""
+        with self._lock:
+            row = self.conn.execute("SELECT fields FROM documents WHERE id = ?", (doc_id,)).fetchone()
+            self.conn.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+            self.conn.commit()
+            if row:
+                fields = json.loads(row["fields"] or "{}")
+                raw = fields.get("raw_path")
+                if raw:
+                    from pathlib import Path as _P
+                    try:
+                        _P(raw).unlink(missing_ok=True)
+                    except OSError:
+                        pass
+            self.log("human", "document_deleted", {"doc_id": doc_id})
+
     # --- decisions -------------------------------------------------------
 
     def create_decision(self, kind: str, context: dict[str, Any], options: list[dict[str, Any]]) -> int:
@@ -113,6 +138,7 @@ class Store:
             )
             self.conn.commit()
             self.log("agent", "decision_requested", {"decision_id": cur.lastrowid, "kind": kind})
+            assert cur.lastrowid is not None
             return cur.lastrowid
 
     def pending_decisions(self) -> list[dict[str, Any]]:

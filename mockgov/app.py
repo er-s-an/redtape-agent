@@ -7,6 +7,7 @@ source URLs they were modeled on.
 """
 from __future__ import annotations
 
+import copy
 import itertools
 import os
 import threading
@@ -111,6 +112,10 @@ _SLOTS: dict[str, dict] = {
 _BOOKINGS: dict[str, dict] = {}
 _CASES: dict[str, dict] = {}
 
+# pristine templates so /api/admin/reset can restore rules bumped mid-run
+# (the eval suite changes rule versions on purpose; resets must not leak them)
+_PRISTINE_RULES: dict[tuple[str, str], Rule] = copy.deepcopy(_RULES)
+
 
 class BookingRequest(BaseModel):
     slot_id: str
@@ -208,13 +213,15 @@ def submission_status(case_id: str) -> dict:
 @app.post("/api/admin/reset")
 def reset_state() -> dict:
     """Restore the pristine sandbox state: every slot free, no bookings, no
-    cases. Rules are left untouched. Used by the eval runner for per-scenario
-    isolation and by demos that want a clean slate."""
+    cases, rules back to their shipped versions. Used by the eval runner for
+    per-scenario isolation and by demos that want a clean slate."""
     with _lock:
         _BOOKINGS.clear()
         _CASES.clear()
         for slot in _SLOTS.values():
             slot["taken"] = False
+        _RULES.clear()
+        _RULES.update(copy.deepcopy(_PRISTINE_RULES))
     return {"ok": True, "slots_free": len(_SLOTS)}
 
 

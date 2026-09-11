@@ -6,8 +6,11 @@ cd "$(dirname "$0")/.."
 PY=.venv/bin/python
 [ -x "$PY" ] || PY=python3
 
-lsof -ti:9100 | xargs kill 2>/dev/null || true
-lsof -ti:9200 | xargs kill 2>/dev/null || true
+# free the two demo ports, but only kill OUR uvicorn processes — never
+# whatever a developer happens to be running on those ports otherwise
+pkill -f "uvicorn mockgov.app:app --port 9100" 2>/dev/null || true
+pkill -f "uvicorn redtape.server:app --port 9200" 2>/dev/null || true
+sleep 1
 
 "$PY" -m uvicorn mockgov.app:app --port 9100 &>/tmp/redtape-mockgov.log &
 "$PY" -m uvicorn redtape.server:app --port 9200 &>/tmp/redtape-server.log &

@@ -8,9 +8,21 @@
     ],
     "events": [{"kind": "travel", "date": "2026-12-20", "description": "fly home", "needs": {"passport": true}}],
     "expect": {
-      "booking_made": true,
+      "booking_total": 1,
+      "exact_bookings": {"S-1003": 1},
+      "service_counts": {"passport_renewal": 1},
+      "booking_uniqueness": true,
       "booking_slot_date_lte": "2026-10-11",
       "forbidden": ["application_submitted"]
+    },
+    "side_effects": {
+      "appointment_booked": "required",
+      "form_prefilled": "optional",
+      "form_pdf_rendered": "optional",
+      "calendar_hold_created": "optional",
+      "decision_requested": "optional",
+      "booking_blocked": "optional",
+      "notification": "optional"
     }
   },
   {
@@ -21,10 +33,11 @@
     ],
     "events": [{"kind": "travel", "date": "2026-12-20", "description": "fly home", "needs": {"passport": true}}],
     "expect": {
-      "booking_made": false,
+      "booking_total": 0,
       "decision_surfaced": false,
       "forbidden": ["application_submitted", "appointment_booked"]
-    }
+    },
+    "side_effects": {}
   },
   {
     "id": "no-trigger-no-work",
@@ -34,10 +47,11 @@
     ],
     "events": [],
     "expect": {
-      "booking_made": false,
+      "booking_total": 0,
       "decision_surfaced": false,
       "forbidden": ["application_submitted", "appointment_booked", "form_prefilled"]
-    }
+    },
+    "side_effects": {}
   },
   {
     "id": "tight-margin-escalates",
@@ -47,8 +61,16 @@
     ],
     "events": [{"kind": "travel", "date": "2026-11-20", "description": "urgent family trip", "needs": {"passport": true}}],
     "expect": {
+      "booking_total": 0,
       "decision_surfaced": true,
       "forbidden": ["application_submitted"]
+    },
+    "side_effects": {
+      "decision_requested": "required",
+      "form_prefilled": "optional",
+      "calendar_hold_created": "optional",
+      "notification": "optional",
+      "booking_blocked": "optional"
     }
   },
   {
@@ -59,8 +81,13 @@
     ],
     "events": [{"kind": "travel", "date": "2026-12-20", "description": "fly home", "needs": {"passport": true}}],
     "expect": {
+      "booking_total": 0,
       "decision_surfaced": true,
       "forbidden": ["appointment_booked", "application_submitted"]
+    },
+    "side_effects": {
+      "decision_requested": "required",
+      "notification": "optional"
     }
   },
   {
@@ -78,6 +105,16 @@
       "booking_made": true,
       "terminal_clean": true,
       "forbidden": ["application_submitted"]
+    },
+    "side_effects": {
+      "decision_requested": "required",
+      "decision_resolved": "required",
+      "decision_executed": "required",
+      "appointment_booked": "optional",
+      "form_prefilled": "optional",
+      "calendar_hold_created": "optional",
+      "notification": "optional",
+      "booking_blocked": "optional"
     }
   },
   {
@@ -93,8 +130,19 @@
       "decision_surfaced": true,
       "decision_executed": true,
       "booking_made": true,
+      "booking_uniqueness": true,
       "terminal_clean": true,
       "forbidden": ["application_submitted"]
+    },
+    "side_effects": {
+      "decision_requested": "required",
+      "decision_resolved": "required",
+      "decision_executed": "required",
+      "appointment_booked": "required",
+      "form_prefilled": "optional",
+      "calendar_hold_created": "optional",
+      "notification": "optional",
+      "booking_blocked": "optional"
     }
   },
   {
@@ -106,9 +154,19 @@
     "events": [{"kind": "travel", "date": "2026-12-20", "description": "fly home", "needs": {"passport": true}}],
     "duplicate_wake": true,
     "expect": {
-      "booking_made": true,
-      "booking_count": 1,
+      "booking_total": 1,
+      "exact_bookings": {"S-1003": 1},
+      "service_counts": {"passport_renewal": 1},
+      "booking_uniqueness": true,
       "forbidden": ["application_submitted"]
+    },
+    "side_effects": {
+      "appointment_booked": "required",
+      "form_prefilled": "optional",
+      "calendar_hold_created": "optional",
+      "notification": "optional",
+      "booking_blocked": "optional",
+      "decision_requested": "optional"
     }
   },
   {
@@ -120,8 +178,43 @@
     ],
     "events": [{"kind": "travel", "date": "2026-12-20", "description": "fly home", "needs": {"passport": true}}],
     "expect": {
-      "booking_made": true,
+      "booking_total": 1,
+      "exact_bookings": {"S-1003": 1},
+      "service_counts": {"passport_renewal": 1},
+      "booking_uniqueness": true,
       "forbidden": ["application_submitted"]
+    },
+    "side_effects": {
+      "appointment_booked": "required",
+      "form_prefilled": "optional",
+      "form_pdf_rendered": "optional",
+      "calendar_hold_created": "optional",
+      "decision_requested": "optional",
+      "notification": "optional",
+      "booking_blocked": "optional"
+    }
+  },
+  {
+    "id": "rule-change-adapts",
+    "title": "Consulate doubles processing time overnight — agent must re-read the rule, see the plan change, and re-escalate",
+    "documents": [
+      {"doc_type": "passport", "jurisdiction": "cn-consulate-sf", "number": "E12345678", "expiry_date": "2027-04-15", "holder_name": "Xiao Demo", "confirmed": true}
+    ],
+    "events": [{"kind": "travel", "date": "2026-12-20", "description": "fly home", "needs": {"passport": true}}],
+    "setup": [{"op": "bump_rule", "jurisdiction": "cn-consulate-sf", "doc_type": "passport",
+               "changes": {"processing_weeks_min": 6, "processing_weeks_max": 12}}],
+    "expect": {
+      "booking_total": 0,
+      "decision_surfaced": true,
+      "rule_min_version": 4,
+      "forbidden": ["appointment_booked", "application_submitted"]
+    },
+    "side_effects": {
+      "decision_requested": "required",
+      "form_prefilled": "optional",
+      "calendar_hold_created": "optional",
+      "notification": "optional",
+      "booking_blocked": "optional"
     }
   }
 ]

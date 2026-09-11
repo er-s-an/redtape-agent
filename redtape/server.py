@@ -21,6 +21,7 @@ from pydantic import BaseModel
 
 from .paths import DATA_DIR, REPO_ROOT
 from .store import Store
+from .clock import today as clock_today
 
 MOCKGOV_BASE = "http://localhost:9100"
 STATIC_DIR = Path(__file__).parent / "static"
@@ -42,7 +43,7 @@ def store() -> Store:
 @app.get("/api/state")
 def state() -> dict:
     s = store()
-    today = date.today()
+    today = clock_today()
     docs = []
     for d in s.list_documents():
         expiry = date.fromisoformat(d["expiry_date"])
@@ -136,25 +137,22 @@ def resolve(decision_id: int, req: ResolveRequest) -> dict:
 
 @app.post("/api/documents/{doc_id}/confirm")
 def confirm_document(doc_id: int) -> dict:
-    s = store()
-    s.conn.execute("UPDATE documents SET confirmed = 1 WHERE id = ?", (doc_id,))
-    s.conn.commit()
-    s.log("human", "document_confirmed", {"doc_id": doc_id})
+    store().confirm_document(doc_id)
     return {"ok": True}
 
 
 @app.delete("/api/documents/{doc_id}")
 def delete_document(doc_id: int) -> dict:
-    s = store()
-    s.conn.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
-    s.conn.commit()
+    store().delete_document(doc_id)
     return {"ok": True}
 
 
 @app.post("/api/documents/upload")
 async def upload_document(file: UploadFile) -> dict:
     """Extract document fields from a photo via the vision model, then store
-    unconfirmed — the human confirms before the agent trusts it."""
+    unconfirmed — the human confirms before the agent trusts it. The raw file
+    is kept locally (and removed when the document is deleted); it is sent to
+    the configured vision provider for extraction."""
     from .vision import extract_document_fields
     data = await file.read()
     suffix = Path(file.filename or "doc.jpg").suffix or ".jpg"
@@ -163,7 +161,8 @@ async def upload_document(file: UploadFile) -> dict:
     raw_path = raw_dir / f"{datetime.now().strftime('%Y%m%d-%H%M%S')}{suffix}"
     raw_path.write_bytes(data)
     fields = extract_document_fields(raw_path)
-    doc_id = store().add_document({**fields, "confirmed": False})
+    doc_id = store().add_document({**fields, "confirmed": False,
+                                   "fields": {"raw_path": str(raw_path)}})
     return {"doc_id": doc_id, "extracted": fields}
 
 

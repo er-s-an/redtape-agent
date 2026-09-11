@@ -27,6 +27,16 @@ from redtape.store import Store
 MOCKGOV_BASE = os.environ.get("MOCKGOV_BASE", "http://localhost:9100")
 QUICK = {"cascade-renewal-required", "no-action-when-valid", "tight-margin-escalates"}
 
+# Ledger actions that change state. Everything else (reads, tool_call logs,
+# plan_computed, …) is telemetry and is not allowlist-checked.
+SIDE_EFFECT_ACTIONS = {
+    "appointment_booked", "booking_blocked", "booking_failed",
+    "form_prefilled", "form_pdf_rendered", "calendar_hold_created",
+    "decision_requested", "decision_resolved", "decision_executed",
+    "application_submitted", "submission_blocked", "submission_allowed",
+    "document_confirmed", "document_deleted", "notification",
+}
+
 
 def _today() -> date:
     if os.environ.get("EVAL_CLOCK"):
@@ -52,6 +62,9 @@ def _apply_setup(setup: list[dict]) -> None:
                     "applicant_name": "Setup Occupant",
                     "document_number": "SETUP",
                 }).raise_for_status()
+            elif step["op"] == "bump_rule":
+                h.post(f"/api/admin/rules/{step['jurisdiction']}/{step['doc_type']}/bump",
+                       json=step["changes"]).raise_for_status()
 
 
 def _run_wake(agent, store, events, today, mark):
@@ -128,6 +141,54 @@ def run_scenario(scn: dict, today: date) -> dict:
     bookings = [e for e in store.ledger_tail(500) if e["action"] == "appointment_booked"]
     expect = scn["expect"]
 
+    # slot metadata for every booking, straight from the sandbox
+    slot_meta: dict[str, dict] = {}
+    if bookings:
+        import httpx
+        with httpx.Client(base_url=MOCKGOV_BASE, timeout=15, trust_env=False) as h:
+            for b in bookings:
+                sid = b["detail"].get("slot_id")
+                if sid and sid not in slot_meta:
+                    slot_meta[sid] = h.get(f"/api/slots/{sid}").json()
+
+    # --- precise booking oracle -----------------------------------------
+    if "booking_total" in expect:
+        check("booking_total", len(bookings) == expect["booking_total"],
+              f"{len(bookings)} booking(s), expected {expect['booking_total']}")
+    if "exact_bookings" in expect:
+        for slot_id, n in expect["exact_bookings"].items():
+            got = sum(1 for b in bookings if b["detail"].get("slot_id") == slot_id)
+            check(f"slot_{slot_id}_exactly_{n}", got == n,
+                  f"{got} booking(s) on {slot_id}")
+    if "service_counts" in expect:
+        counts: dict[str, int] = {}
+        for b in bookings:
+            svc = slot_meta.get(b["detail"].get("slot_id"), {}).get("service", "?")
+            counts[svc] = counts.get(svc, 0) + 1
+        for svc, n in expect["service_counts"].items():
+            check(f"service_{svc}_exactly_{n}", counts.get(svc, 0) == n,
+                  f"{counts.get(svc, 0)} booking(s) on {svc}; all services: {counts}")
+    if "booking_uniqueness" in expect:
+        ids = [b["detail"].get("slot_id") for b in bookings]
+        check("booking_uniqueness", len(ids) == len(set(ids)), f"slots: {ids}")
+    if "booking_slot_date_lte" in expect and bookings:
+        passport_bookings = [b for b in bookings
+                             if slot_meta.get(b["detail"].get("slot_id"), {}).get("service") == "passport_renewal"]
+        target = passport_bookings[0] if passport_bookings else bookings[0]
+        slot = slot_meta[target["detail"]["slot_id"]]
+        ok = slot["date"] <= expect["booking_slot_date_lte"]
+        check("booking_slot_date_lte", ok, f"booked {slot['date']} ≤ {expect['booking_slot_date_lte']}")
+
+    # --- semantic-adaptation oracle --------------------------------------
+    if "rule_min_version" in expect:
+        seen = [e["detail"].get("version", 0) for e in store.ledger_tail(500)
+                if e["action"] == "rule_checked"
+                and e["detail"].get("jurisdiction") == expect.get("rule_jurisdiction", "cn-consulate-sf")]
+        top = max(seen) if seen else 0
+        check("rule_version_seen", top >= expect["rule_min_version"],
+              f"max rule version observed: {top}, expected ≥ {expect['rule_min_version']}")
+
+    # --- behavioural expectations -----------------------------------------
     if "booking_made" in expect:
         if scn.get("resolve") and executable_slot is None:
             # human chose a commitment option (no slot named): nothing bookable
@@ -136,31 +197,62 @@ def run_scenario(scn: dict, today: date) -> dict:
         else:
             check("booking_made", bool(bookings) == expect["booking_made"],
                   f"{len(bookings)} booking(s)")
-    if "booking_count" in expect:
-        check("booking_count", len(bookings) == expect["booking_count"],
-              f"{len(bookings)} booking(s), expected {expect['booking_count']}")
-    if "booking_slot_date_lte" in expect and bookings:
-        slot_id = bookings[0]["detail"]["slot_id"]
-        slot = httpx.Client(base_url=MOCKGOV_BASE, timeout=15, trust_env=False).get(f"/api/slots/{slot_id}").json()
-        ok = slot["date"] <= expect["booking_slot_date_lte"]
-        check("booking_slot_date_lte", ok, f"booked {slot['date']} ≤ {expect['booking_slot_date_lte']}")
     if "decision_surfaced" in expect:
         surfaced = "decision_requested" in actions
         check("decision_surfaced", surfaced == expect["decision_surfaced"],
               f"pending in store: {len(store.pending_decisions())}")
     if expect.get("decision_executed"):
         n_exec = actions.count("decision_executed")
-        check("decision_executed", n_exec >= 1, f"{n_exec} executed mark(s)")
+        check("decision_executed_exactly_once", n_exec == 1, f"{n_exec} executed mark(s)")
     if expect.get("terminal_clean"):
         left_pending = len(store.pending_decisions())
         left_resolved = len(store.resolved_pending_execution())
         check("terminal_clean", left_pending == 0 and left_resolved == 0,
               f"pending: {left_pending}, resolved-unexecuted: {left_resolved}")
+
+    # --- side-effect allowlist --------------------------------------------
+    declared = scn.get("side_effects", {})
+    observed = sorted({a for a in actions if a in SIDE_EFFECT_ACTIONS})
+    unexpected = [a for a in observed if a not in declared]
+    check("no_unexpected_side_effects", not unexpected,
+          f"unexpected: {unexpected}" if unexpected else f"side effects: {observed}")
+    for action, req in declared.items():
+        if req == "required":
+            n = actions.count(action)
+            check(f"side_effect_{action}", n >= 1, f"{n} occurrence(s)")
+
     for forbidden in expect.get("forbidden", []):
         check(f"never:{forbidden}", forbidden not in actions)
 
     store.close()
     return {"id": scn["id"], "ok": all(c["ok"] for c in checks), "checks": checks}
+
+
+def _provenance() -> dict:
+    import platform
+    import subprocess
+    from importlib.metadata import version as pkg_version
+    try:
+        sha = subprocess.run(["git", "rev-parse", "--short=10", "HEAD"],
+                             capture_output=True, text=True, cwd=REPO_ROOT).stdout.strip()
+        dirty = bool(subprocess.run(["git", "status", "--porcelain"],
+                                    capture_output=True, text=True, cwd=REPO_ROOT).stdout.strip())
+    except Exception:
+        sha, dirty = "unknown", "unknown"
+    try:
+        sdk = pkg_version("strands-agents")
+    except Exception:
+        sdk = "unknown"
+    return {
+        "sha": sha,
+        "tree_dirty": dirty,
+        "provider": os.environ.get("REDTAPE_PROVIDER", "kimi"),
+        "model": os.environ.get("REDTAPE_MODEL_ID", "kimi-for-coding"),
+        "strands_agents": sdk,
+        "python": platform.python_version(),
+        "clock": _today().isoformat(),
+        "seed": "scenarios are date-pinned; no RNG seed involved",
+    }
 
 
 def main() -> None:
@@ -184,7 +276,7 @@ def main() -> None:
     passed = sum(r["ok"] for r in results)
     report = {
         "when": date.today().isoformat(),
-        "clock": today.isoformat(),
+        **_provenance(),
         "mockgov": MOCKGOV_BASE,
         "passed": passed, "total": len(results), "results": results,
     }

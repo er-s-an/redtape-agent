@@ -1,8 +1,12 @@
+# pyright: reportMissingImports=false
 """Stretch: deploy the agent to Amazon Bedrock AgentCore Runtime.
 
     pip install -e ".[agentcore]"
     npm i -g @aws/agentcore
     agentcore create && agentcore deploy
+
+(bedrock_agentcore is the optional [agentcore] extra — not installed for the
+local demo, so the import is intentionally unresolved there.)
 """
 from __future__ import annotations
 

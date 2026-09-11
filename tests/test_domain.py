@@ -60,7 +60,8 @@ def test_store_decision_flow_and_ledger_integrity(tmp_path):
     doc_id = store.add_document({"doc_type": "passport", "jurisdiction": "cn-consulate-sf",
                                  "number": "E12345678", "expiry_date": "2027-04-15",
                                  "holder_name": "Xiao Demo", "confirmed": True})
-    assert store.get_document_by_type("passport")["id"] == doc_id
+    doc = store.get_document_by_type("passport")
+    assert doc is not None and doc["id"] == doc_id
     did = store.create_decision("pick_slot", {"why": "test"}, [{"slot": "S-1003"}, {"slot": "S-1017"}])
     assert len(store.pending_decisions()) == 1
     store.resolve_decision(did, "S-1003")

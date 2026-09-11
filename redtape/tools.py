@@ -158,9 +158,16 @@ def check_appointment_slots(office: str, service: str) -> list[dict] | dict:
 
 
 @tool
-def book_appointment(slot_id: str, reason: str) -> dict:
-    """Book an appointment slot. Guardrail hooks validate the slot against
-    computed deadlines before this executes — an unsafe slot is cancelled."""
+def book_appointment(slot_id: str, office: str, service: str, doc_type: str,
+                     reason: str) -> dict:
+    """Book an appointment slot. Guardrail hooks bind the request to the plan
+    before it executes: the slot's office/service must match the arguments,
+    the named document must exist, be confirmed, and belong to that office,
+    and the date must sit inside the dependency-graph window (or the slot must
+    be unlocked by an approved decision). Autonomous bookings are only valid
+    for the travel-triggered passport renewal — anything else needs approval.
+    Take office/service from the rule payload's `service` field and the
+    document's jurisdiction — never invent them."""
     c = ctx()
     with _http() as h:
         resp = h.post("/api/bookings", json={
@@ -174,6 +181,8 @@ def book_appointment(slot_id: str, reason: str) -> dict:
         resp.raise_for_status()
         booking = resp.json()
     c.store.log("agent", "appointment_booked", {"slot_id": slot_id, "reason": reason,
+                                                "office": office, "service": service,
+                                                "doc_type": doc_type,
                                                 "confirmation": booking["confirmation_code"]})
     return booking
 
@@ -220,15 +229,18 @@ def draft_form_prefill(jurisdiction: str, doc_type: str) -> dict:
     }
     path = forms_dir / f"{jurisdiction}-{doc_type}-draft.json"
     path.write_text(json.dumps(draft, indent=2, ensure_ascii=False))
+    import hashlib
+    draft_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
     c.store.log("agent", "form_prefilled", {"jurisdiction": jurisdiction, "doc_type": doc_type,
-                                            "rule_version": rule["version"], "path": str(path)})
+                                            "rule_version": rule["version"], "path": str(path),
+                                            "draft_sha256": draft_sha256})
     from .pdf import render_application_pdf
     pdf_path = render_application_pdf(
         forms_dir / f"{jurisdiction}-{doc_type}-draft.pdf",
         jurisdiction=jurisdiction, doc_type=doc_type, applicant=draft["applicant"], rule=rule,
     )
     c.store.log("agent", "form_pdf_rendered", {"path": pdf_path})
-    return {"draft_path": str(path), "pdf_path": pdf_path,
+    return {"draft_path": str(path), "pdf_path": pdf_path, "draft_sha256": draft_sha256,
             "fee_usd": draft["fee_usd"], "status": draft["status"]}
 
 
