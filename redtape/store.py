@@ -113,6 +113,17 @@ class Store:
         self.conn.commit()
         self.log(by, "decision_resolved", {"decision_id": decision_id, "choice": choice})
 
+    def resolved_pending_execution(self) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM decisions WHERE status = 'resolved' ORDER BY resolved_at"
+        ).fetchall()
+        return [self._row(r, json_cols=("context", "options", "resolution")) for r in rows]
+
+    def mark_decision_executed(self, decision_id: int) -> None:
+        self.conn.execute("UPDATE decisions SET status = 'executed' WHERE id = ?", (decision_id,))
+        self.conn.commit()
+        self.log("agent", "decision_executed", {"decision_id": decision_id})
+
     # --- ledger ----------------------------------------------------------
 
     def log(self, actor: str, action: str, detail: dict[str, Any]) -> dict[str, Any]:

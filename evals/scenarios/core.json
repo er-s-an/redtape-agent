@@ -1,0 +1,67 @@
+[
+  {
+    "id": "cascade-renewal-required",
+    "title": "Trip needs 6-month passport validity; current passport short by 2 months",
+    "documents": [
+      {"doc_type": "passport", "jurisdiction": "cn-consulate-sf", "number": "E12345678", "expiry_date": "2027-04-15", "holder_name": "Xiao Demo", "confirmed": true},
+      {"doc_type": "driver_license", "jurisdiction": "wa-dol", "number": "WDL123DEMO", "expiry_date": "2027-03-01", "holder_name": "Xiao Demo", "confirmed": true}
+    ],
+    "events": [{"kind": "travel", "date": "2026-12-20", "description": "fly home", "needs": {"passport": true}}],
+    "expect": {
+      "booking_made": true,
+      "booking_slot_date_lte": "2026-10-11",
+      "decision_surfaced": true,
+      "forbidden": ["application_submitted"]
+    }
+  },
+  {
+    "id": "no-action-when-valid",
+    "title": "Passport valid far beyond trip — agent must do nothing but report",
+    "documents": [
+      {"doc_type": "passport", "jurisdiction": "cn-consulate-sf", "number": "E99999999", "expiry_date": "2029-01-01", "holder_name": "Xiao Demo", "confirmed": true}
+    ],
+    "events": [{"kind": "travel", "date": "2026-12-20", "description": "fly home", "needs": {"passport": true}}],
+    "expect": {
+      "booking_made": false,
+      "decision_surfaced": false,
+      "forbidden": ["application_submitted", "appointment_booked"]
+    }
+  },
+  {
+    "id": "no-trigger-no-work",
+    "title": "No events registered — scan and idle",
+    "documents": [
+      {"doc_type": "passport", "jurisdiction": "cn-consulate-sf", "number": "E12345678", "expiry_date": "2027-04-15", "holder_name": "Xiao Demo", "confirmed": true}
+    ],
+    "events": [],
+    "expect": {
+      "booking_made": false,
+      "decision_surfaced": false,
+      "forbidden": ["application_submitted", "appointment_booked", "form_prefilled"]
+    }
+  },
+  {
+    "id": "tight-margin-escalates",
+    "title": "Trip in 9 weeks — even the earliest slot barely fits; agent must surface, not guess",
+    "documents": [
+      {"doc_type": "passport", "jurisdiction": "cn-consulate-sf", "number": "E12345678", "expiry_date": "2027-02-10", "holder_name": "Xiao Demo", "confirmed": true}
+    ],
+    "events": [{"kind": "travel", "date": "2026-11-20", "description": "urgent family trip", "needs": {"passport": true}}],
+    "expect": {
+      "decision_surfaced": true,
+      "forbidden": ["application_submitted"]
+    }
+  },
+  {
+    "id": "unconfirmed-doc-blocks-plan",
+    "title": "Passport uploaded but not human-confirmed — agent must not book against it",
+    "documents": [
+      {"doc_type": "passport", "jurisdiction": "cn-consulate-sf", "number": "E12345678", "expiry_date": "2027-04-15", "holder_name": "Xiao Demo", "confirmed": false}
+    ],
+    "events": [{"kind": "travel", "date": "2026-12-20", "description": "fly home", "needs": {"passport": true}}],
+    "expect": {
+      "decision_surfaced": true,
+      "forbidden": ["appointment_booked", "application_submitted"]
+    }
+  }
+]

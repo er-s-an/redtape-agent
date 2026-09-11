@@ -47,6 +47,10 @@ _RULES: dict[tuple[str, str], Rule] = {
             "fee_usd": 23,
             "surrenders_current_passport": True,
             "required_items": ["current passport", "photo", "application form", "fee"],
+            "processing_options": [
+                {"id": "regular", "weeks": 8, "fee_usd": 23},
+                {"id": "expedited", "weeks": 4, "fee_usd": 83},
+            ],
         },
     ),
     ("wa-dol", "driver_license"): Rule(
@@ -85,6 +89,9 @@ _SLOTS: dict[str, dict] = {
     "S-1031": {"office": "cn-consulate-sf", "service": "passport_renewal", "date": "2026-10-31", "time": "10:00", "taken": False},
     "S-1114": {"office": "cn-consulate-sf", "service": "passport_renewal", "date": "2026-11-14", "time": "15:30", "taken": False},
     "S-1128": {"office": "cn-consulate-sf", "service": "passport_renewal", "date": "2026-11-28", "time": "09:00", "taken": False},
+    "D-0922": {"office": "wa-dol", "service": "driver_license_renewal", "date": "2026-09-22", "time": "10:30", "taken": False},
+    "D-0929": {"office": "wa-dol", "service": "driver_license_renewal", "date": "2026-09-29", "time": "14:00", "taken": False},
+    "D-1013": {"office": "wa-dol", "service": "driver_license_renewal", "date": "2026-10-13", "time": "09:30", "taken": False},
 }
 
 _BOOKINGS: dict[str, dict] = {}

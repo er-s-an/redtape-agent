@@ -213,7 +213,14 @@ def draft_form_prefill(jurisdiction: str, doc_type: str) -> dict:
     path.write_text(json.dumps(draft, indent=2, ensure_ascii=False))
     c.store.log("agent", "form_prefilled", {"jurisdiction": jurisdiction, "doc_type": doc_type,
                                             "rule_version": rule["version"], "path": str(path)})
-    return {"draft_path": str(path), "fee_usd": draft["fee_usd"], "status": draft["status"]}
+    from .pdf import render_application_pdf
+    pdf_path = render_application_pdf(
+        forms_dir / f"{jurisdiction}-{doc_type}-draft.pdf",
+        jurisdiction=jurisdiction, doc_type=doc_type, applicant=draft["applicant"], rule=rule,
+    )
+    c.store.log("agent", "form_pdf_rendered", {"path": pdf_path})
+    return {"draft_path": str(path), "pdf_path": pdf_path,
+            "fee_usd": draft["fee_usd"], "status": draft["status"]}
 
 
 @tool
@@ -245,6 +252,14 @@ def request_human_decision(kind: str, context: str, options: list[dict]) -> dict
     )
     return {"decision_id": decision_id, "status": "pending",
             "message": "Surfaced to the Decision Inbox. Stop and wait — do not act on this until resolved."}
+
+
+@tool
+def mark_decision_executed(decision_id: int) -> dict:
+    """Mark a human-resolved decision as fully executed after you have carried
+    out its chosen option (booking made, drafts prepared, holds placed)."""
+    ctx().store.mark_decision_executed(decision_id)
+    return {"decision_id": decision_id, "status": "executed"}
 
 
 @tool

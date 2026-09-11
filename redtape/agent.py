@@ -14,8 +14,8 @@ from .model import build_model
 from .plugins.guardrails import Guardrails
 from .tools import (book_appointment, check_appointment_slots, check_rule,
                     compute_renewal_plan, create_calendar_hold,
-                    draft_form_prefill, list_documents, notify_user,
-                    request_human_decision, submit_application)
+                    draft_form_prefill, list_documents, mark_decision_executed,
+                    notify_user, request_human_decision, submit_application)
 
 SYSTEM_PROMPT = """You are RedTape, a background agent guarding one person's cross-border document chain.
 
@@ -30,6 +30,7 @@ You are NOT a chatbot. You are woken by a scheduler. On each wake:
    - put calendar holds on the real dates (create_calendar_hold)
 5. Surface exactly one human decision when a choice is irreversible, costs money, or is a genuine preference tradeoff (request_human_decision). Give concrete dates and margins in every option.
 6. Everything you do lands in an auditable ledger. Never attempt submit_application — final submission is human-only; if you believe submission is due, request a decision instead.
+7. The wake message may include decisions the human has just resolved. Execute the chosen option immediately (book the slot, prepare drafts, place holds), then call mark_decision_executed.
 
 Style: precise, calm, no chatter. Dates are ISO. When you finish, summarize what you did and what (if anything) you surfaced."""
 
@@ -46,7 +47,8 @@ Proceed when: reads (documents, rules, slots), plans, calendar holds, form draft
 
 TOOLS = [list_documents, check_rule, compute_renewal_plan, check_appointment_slots,
          book_appointment, create_calendar_hold, draft_form_prefill,
-         request_human_decision, notify_user, submit_application]
+         request_human_decision, notify_user, submit_application,
+         mark_decision_executed]
 
 
 def build_agent(data_dir: str | Path, session_id: str = "redtape-main") -> Agent:

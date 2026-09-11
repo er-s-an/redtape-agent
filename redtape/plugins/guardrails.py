@@ -79,9 +79,14 @@ class Guardrails(HookProvider):
             return
         latest = book_steps[0].latest_date
         if slot_date > latest:
+            if self._approved_decision_covers(slot_id):
+                c.store.log("hook", "booking_allowed",
+                            {"slot_id": slot_id, "via": "approved decision"})
+                return
             event.cancel_tool = (
                 f"slot {slot_id} is on {slot_date.isoformat()}, after the latest safe booking date "
-                f"{latest.isoformat()} computed from the dependency graph — pick an earlier slot"
+                f"{latest.isoformat()} computed from the dependency graph — pick an earlier slot, "
+                f"or surface a decision if a later slot plus expedited processing is the right tradeoff"
             )
             c.store.log("hook", "booking_blocked",
                         {"slot_id": slot_id, "slot_date": slot_date.isoformat(),
@@ -90,6 +95,18 @@ class Guardrails(HookProvider):
         c.store.log("hook", "booking_allowed",
                     {"slot_id": slot_id, "slot_date": slot_date.isoformat(),
                      "latest_safe": latest.isoformat()})
+
+    def _approved_decision_covers(self, slot_id: str) -> bool:
+        import json
+        c = ctx()
+        rows = c.store.conn.execute(
+            "SELECT resolution FROM decisions WHERE status = 'resolved' AND kind = 'pick_slot'"
+        ).fetchall()
+        for row in rows:
+            choice = json.loads(row["resolution"]).get("choice", {})
+            if choice.get("slot_id") == slot_id:
+                return True
+        return False
 
     def _guard_submission(self, event: BeforeToolCallEvent, tool_input: dict) -> None:
         c = ctx()

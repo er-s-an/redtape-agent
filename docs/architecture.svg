@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="560" viewBox="0 0 1080 560" font-family="Helvetica, Arial, sans-serif">
+  <rect width="1080" height="560" fill="#faf7f2"/>
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#78716c"/></marker>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#b3331d"/></marker>
+  </defs>
+
+  <text x="40" y="44" font-size="22" font-weight="700" font-family="Georgia, serif" fill="#1c1917">RedTape — architecture</text>
+  <text x="40" y="66" font-size="12" fill="#78716c">background agent · deterministic guardrails · human decisions at the center</text>
+
+  <!-- triggers -->
+  <rect x="40" y="100" width="180" height="110" rx="12" fill="#fffdf9" stroke="#1c1917"/>
+  <text x="130" y="126" text-anchor="middle" font-size="13" font-weight="700" fill="#1c1917">triggers</text>
+  <text x="130" y="150" text-anchor="middle" font-size="11" fill="#44403c">scheduler (cron)</text>
+  <text x="130" y="170" text-anchor="middle" font-size="11" fill="#44403c">document upload (photo)</text>
+  <text x="130" y="190" text-anchor="middle" font-size="11" fill="#44403c">travel / renewal events</text>
+
+  <!-- agent core -->
+  <rect x="300" y="100" width="300" height="260" rx="14" fill="#fffdf9" stroke="#b3331d" stroke-width="2"/>
+  <text x="450" y="126" text-anchor="middle" font-size="14" font-weight="700" fill="#b3331d">Strands agent (model-driven loop)</text>
+
+  <rect x="316" y="140" width="268" height="56" rx="8" fill="#f6e4df"/>
+  <text x="450" y="162" text-anchor="middle" font-size="12" font-weight="700" fill="#b3331d">guardrail hooks — before every tool call</text>
+  <text x="450" y="180" text-anchor="middle" font-size="10.5" fill="#44403c">cancel bookings past the safe date · submissions need your approval</text>
+
+  <rect x="316" y="206" width="268" height="52" rx="8" fill="#faeed7"/>
+  <text x="450" y="226" text-anchor="middle" font-size="12" font-weight="700" fill="#a05f08">steering buddy (LLMSteeringHandler)</text>
+  <text x="450" y="244" text-anchor="middle" font-size="10.5" fill="#44403c">reviews each call against plain-language operating rules</text>
+
+  <rect x="316" y="268" width="268" height="52" rx="8" fill="#e2f0e7"/>
+  <text x="450" y="288" text-anchor="middle" font-size="12" font-weight="700" fill="#2f7d4f">session snapshots (SnapshotSessionManager)</text>
+  <text x="450" y="306" text-anchor="middle" font-size="10.5" fill="#44403c">restarts never lose state</text>
+
+  <!-- tools -->
+  <rect x="300" y="392" width="300" height="128" rx="12" fill="#fffdf9" stroke="#1c1917"/>
+  <text x="450" y="416" text-anchor="middle" font-size="13" font-weight="700" fill="#1c1917">tools</text>
+  <text x="450" y="440" text-anchor="middle" font-size="11" fill="#44403c">documents · rules watcher · backward planner</text>
+  <text x="450" y="460" text-anchor="middle" font-size="11" fill="#44403c">appointments · form prefill (PDF) · calendar</text>
+  <text x="450" y="480" text-anchor="middle" font-size="11" fill="#44403c">decision inbox · notifications</text>
+  <text x="450" y="503" text-anchor="middle" font-size="10.5" fill="#78716c">every call is written to the hash-chained ledger</text>
+
+  <!-- external -->
+  <rect x="680" y="100" width="180" height="110" rx="12" fill="#fffdf9" stroke="#1c1917"/>
+  <text x="770" y="126" text-anchor="middle" font-size="13" font-weight="700" fill="#1c1917">government portal</text>
+  <text x="770" y="150" text-anchor="middle" font-size="11" fill="#44403c">mockgov sandbox in demo</text>
+  <text x="770" y="170" text-anchor="middle" font-size="11" fill="#44403c">slots · versioned rules · intake</text>
+  <text x="770" y="190" text-anchor="middle" font-size="10.5" fill="#78716c">swappable client, same interface</text>
+
+  <!-- store -->
+  <rect x="680" y="252" width="180" height="108" rx="12" fill="#fffdf9" stroke="#1c1917"/>
+  <text x="770" y="278" text-anchor="middle" font-size="13" font-weight="700" fill="#1c1917">local store (SQLite)</text>
+  <text x="770" y="302" text-anchor="middle" font-size="11" fill="#44403c">verified documents</text>
+  <text x="770" y="322" text-anchor="middle" font-size="11" fill="#44403c">dependency graph</text>
+  <text x="770" y="342" text-anchor="middle" font-size="11" fill="#44403c">append-only hash-chained ledger</text>
+
+  <!-- human -->
+  <rect x="680" y="400" width="180" height="120" rx="14" fill="#fff" stroke="#a05f08" stroke-width="2"/>
+  <text x="770" y="428" text-anchor="middle" font-size="14" font-weight="700" fill="#a05f08">you</text>
+  <text x="770" y="452" text-anchor="middle" font-size="11" fill="#44403c">Decision Inbox: the only place</text>
+  <text x="770" y="470" text-anchor="middle" font-size="11" fill="#44403c">RedTape interrupts</text>
+  <text x="770" y="494" text-anchor="middle" font-size="10.5" fill="#78716c">approvals unlock guarded actions</text>
+
+  <!-- UI -->
+  <rect x="40" y="400" width="180" height="120" rx="12" fill="#fffdf9" stroke="#1c1917"/>
+  <text x="130" y="428" text-anchor="middle" font-size="13" font-weight="700" fill="#1c1917">web app</text>
+  <text x="130" y="452" text-anchor="middle" font-size="11" fill="#44403c">documents &amp; countdowns</text>
+  <text x="130" y="470" text-anchor="middle" font-size="11" fill="#44403c">dependency graph · timeline</text>
+  <text x="130" y="488" text-anchor="middle" font-size="11" fill="#44403c">activity in plain language</text>
+
+  <!-- arrows -->
+  <line x1="220" y1="155" x2="296" y2="155" stroke="#78716c" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="258" y="146" text-anchor="middle" font-size="10" fill="#78716c">wake</text>
+
+  <line x1="600" y1="155" x2="676" y2="155" stroke="#78716c" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="638" y="146" text-anchor="middle" font-size="10" fill="#78716c">slots / rules</text>
+
+  <line x1="600" y1="306" x2="676" y2="306" stroke="#78716c" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="638" y="297" text-anchor="middle" font-size="10" fill="#78716c">read / write</text>
+
+  <line x1="680" y1="460" x2="604" y2="460" stroke="#b3331d" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="642" y="451" text-anchor="middle" font-size="10" fill="#b3331d">decisions</text>
+
+  <line x1="300" y1="460" x2="224" y2="460" stroke="#78716c" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="262" y="451" text-anchor="middle" font-size="10" fill="#78716c">state</text>
+
+  <line x1="450" y1="360" x2="450" y2="388" stroke="#78716c" stroke-width="1.5" marker-end="url(#a)"/>
+</svg>

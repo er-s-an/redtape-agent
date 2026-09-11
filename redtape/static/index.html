@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RedTape</title>
+<style>
+  :root {
+    --paper: #faf7f2; --ink: #1c1917; --muted: #78716c; --line: #e7e0d4;
+    --red: #b3331d; --red-soft: #f6e4df; --green: #2f7d4f; --green-soft: #e2f0e7;
+    --amber: #a05f08; --amber-soft: #faeed7; --card: #fffdf9;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--paper); color: var(--ink); font: 15px/1.55 -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 24px 80px; }
+
+  header { display: flex; align-items: baseline; gap: 14px; border-bottom: 3px double var(--line); padding-bottom: 16px; }
+  .brand { font: 700 30px/1 Georgia, "Times New Roman", serif; letter-spacing: -0.5px; }
+  .brand em { color: var(--red); font-style: normal; }
+  .tagline { color: var(--muted); font-size: 13px; flex: 1; }
+  #wake-btn { background: var(--ink); color: var(--paper); border: 0; border-radius: 8px; padding: 10px 18px; font: 600 14px inherit; cursor: pointer; }
+  #wake-btn:disabled { opacity: .45; cursor: default; }
+  #wake-btn.live { background: var(--red); }
+
+  h2 { font: 700 13px/1 inherit; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin: 34px 0 12px; }
+  h2 .count { color: var(--red); }
+
+  .docs { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+  .doc { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; position: relative; }
+  .doc .type { font: 600 15px Georgia, serif; text-transform: capitalize; }
+  .doc .juris { color: var(--muted); font-size: 12px; font-family: var(--mono); }
+  .doc .expiry { margin-top: 10px; font-family: var(--mono); font-size: 13px; }
+  .doc .days { display: inline-block; margin-top: 8px; padding: 3px 10px; border-radius: 999px; font: 600 12px var(--mono); }
+  .days.ok { background: var(--green-soft); color: var(--green); }
+  .days.warn { background: var(--amber-soft); color: var(--amber); }
+  .days.bad { background: var(--red-soft); color: var(--red); }
+  .doc .unconfirmed { position: absolute; top: 12px; right: 12px; font: 600 11px var(--mono); color: var(--amber); }
+  .doc .confirm-btn { margin-top: 8px; font-size: 12px; }
+
+  .graph { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .tl { display: flex; align-items: center; gap: 0; padding: 26px 8px 30px; position: relative; }
+  .tl::before { content: ""; position: absolute; left: 24px; right: 24px; top: 50%; border-top: 2px solid var(--line); }
+  .tl .mark { position: relative; flex: 1; text-align: center; }
+  .tl .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--card); border: 3px solid var(--red); margin: 0 auto; position: relative; z-index: 1; }
+  .tl .mark.travel .dot { border-color: var(--green); }
+  .tl .lab { margin-top: 10px; font: 600 11.5px var(--mono); color: var(--ink); }
+  .tl .dat { font: 500 11px var(--mono); color: var(--muted); }
+
+  .graph svg { display: block; width: 100%; height: auto; }
+
+  .decision { background: linear-gradient(180deg, #fff, var(--amber-soft)); border: 1px solid var(--amber); border-radius: 14px; padding: 20px; margin-bottom: 14px; }
+  .decision .your-call { font: 700 12px var(--mono); color: var(--amber); letter-spacing: .1em; }
+  .decision .kind { font: 700 18px Georgia, serif; margin: 6px 0 8px; text-transform: capitalize; }
+  .decision .context { color: #44403c; white-space: pre-wrap; }
+  .decision .options { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .decision .opt { background: var(--card); border: 1px solid var(--amber); border-radius: 10px; padding: 12px 14px; cursor: pointer; text-align: left; font: 500 13px inherit; max-width: 320px; }
+  .decision .opt:hover { background: #fff; box-shadow: 0 2px 10px rgba(160,95,8,.18); }
+  .decision .opt b { display: block; margin-bottom: 4px; }
+  .decision .opt small { color: var(--muted); }
+  .inbox-empty { color: var(--muted); font-size: 14px; padding: 14px 0; }
+
+  .feed { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .feed .row { display: flex; gap: 12px; padding: 9px 16px; border-top: 1px solid var(--line); font-size: 13.5px; align-items: baseline; }
+  .feed .row:first-child { border-top: 0; }
+  .feed time { font: 500 11px var(--mono); color: var(--muted); flex: 0 0 64px; }
+  .feed .actor { flex: 0 0 62px; font: 600 11px var(--mono); }
+  .actor.agent { color: var(--red); } .actor.hook { color: var(--amber); } .actor.human { color: var(--green); }
+
+  #log-panel { background: #171412; color: #d6d3d1; border-radius: 12px; padding: 16px; font: 12.5px/1.6 var(--mono); white-space: pre-wrap; max-height: 340px; overflow: auto; display: none; }
+  #log-panel.on { display: block; }
+
+  .upload { border: 1.5px dashed var(--line); border-radius: 12px; padding: 22px; text-align: center; color: var(--muted); cursor: pointer; font-size: 14px; }
+  .upload:hover { border-color: var(--red); color: var(--ink); }
+  button.confirm-btn { border: 1px solid var(--amber); background: #fff; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">Red<em>Tape</em></div>
+    <div class="tagline">your documents' keeper — works in the background, surfaces only when it's your call</div>
+    <button id="wake-btn" onclick="runWake()">Run a check</button>
+  </header>
+
+  <h2>Decision inbox <span class="count" id="inbox-count"></span></h2>
+  <div id="inbox"><div class="inbox-empty">Nothing needs you. RedTape is handling it.</div></div>
+
+  <h2>Documents</h2>
+  <div class="docs" id="docs"></div>
+  <div class="upload" style="margin-top:12px" onclick="document.getElementById('file').click()">
+    Drop or click to add a document — a photo is enough, RedTape reads it
+    <input type="file" id="file" accept="image/*" style="display:none" onchange="uploadDoc(this)">
+  </div>
+
+  <h2>Timeline</h2>
+  <div class="graph"><div class="tl" id="timeline"><span class="inbox-empty">No time pressure right now.</span></div></div>
+
+  <h2>Dependency chain</h2>
+  <div class="graph"><svg id="graph-svg" viewBox="0 0 1000 220"></svg></div>
+
+  <h2>Activity</h2>
+  <div class="feed" id="feed"></div>
+
+  <h2 style="display:none" id="log-h2">Agent at work</h2>
+  <div id="log-panel"></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const HUMAN = {
+  documents_scanned: d => `Scanned ${d.count} tracked document(s)`,
+  rule_checked: d => `Re-checked ${d.jurisdiction}/${d.doc_type} rules (v${d.version})`,
+  plan_computed: d => `Computed renewal plan — ${d.steps} step(s), ${d.conflicts} conflict(s)`,
+  slots_checked: d => `Checked appointment availability (${d.available} slot(s) open)`,
+  appointment_booked: d => `Booked appointment ${d.slot_id} — confirmation ${d.confirmation}`,
+  booking_failed: d => `Booking failed for ${d.slot_id}: ${d.reason}`,
+  booking_allowed: d => `Guardrail: ${d.slot_id} within safe window (latest ${d.latest_safe})`,
+  booking_blocked: d => `Guardrail blocked booking ${d.slot_id}: ${d.why || ''}`,
+  submission_blocked: d => `Guardrail blocked submission of ${d.doc_type} — needs your approval`,
+  submission_allowed: d => `Guardrail: submission of ${d.doc_type} approved by you`,
+  form_prefilled: d => `Pre-filled ${d.doc_type} application draft (rules v${d.rule_version})`,
+  calendar_hold_created: d => `Calendar hold: ${d.title} on ${d.day}`,
+  decision_requested: d => `Surfaced a decision for you (#${d.decision_id})`,
+  decision_resolved: d => `You decided #${d.decision_id}`,
+  notification: d => d.message,
+  document_added: d => `Added document (${d.doc_type})`,
+  document_confirmed: d => `You confirmed document #${d.doc_id}`,
+  application_submitted: d => `Submitted application — case ${d.case_id}`,
+  tool_call: null, tool_result: null,
+};
+
+async function refresh() {
+  const s = await (await fetch('/api/state')).json();
+  renderDocs(s.documents);
+  renderInbox(s.decisions);
+  renderFeed(s.activity);
+  renderWake(s.wake);
+  renderTimeline(s.timeline);
+  const g = await (await fetch('/api/graph')).json();
+  renderGraph(g, s.documents);
+}
+
+function chip(days) {
+  if (days < 60) return `<span class="days bad">${days}d left</span>`;
+  if (days < 240) return `<span class="days warn">${days}d left</span>`;
+  return `<span class="days ok">${Math.round(days/30)}mo left</span>`;
+}
+
+function renderDocs(docs) {
+  $('docs').innerHTML = docs.map(d => `
+    <div class="doc">
+      ${d.confirmed ? '' : `<span class="unconfirmed">unconfirmed</span>`}
+      <div class="type">${d.doc_type.replace(/_/g,' ')}</div>
+      <div class="juris">${d.jurisdiction} · ${d.number}</div>
+      <div class="expiry">expires ${d.expiry_date}</div>
+      ${chip(d.days_until_expiry)}
+      ${d.confirmed ? '' : `<br><button class="confirm-btn" onclick="confirmDoc(${d.id})">looks right — confirm</button>`}
+    </div>`).join('');
+}
+
+function renderInbox(decisions) {
+  $('inbox-count').textContent = decisions.length ? decisions.length : '';
+  if (!decisions.length) {
+    $('inbox').innerHTML = '<div class="inbox-empty">Nothing needs you. RedTape is handling it.</div>';
+    return;
+  }
+  $('inbox').innerHTML = decisions.map(d => `
+    <div class="decision">
+      <div class="your-call">YOUR CALL</div>
+      <div class="kind">${d.kind.replace(/_/g,' ')}</div>
+      <div class="context">${d.context.context || ''}</div>
+      <div class="options">
+        ${d.options.map((o, i) => `
+          <button class="opt" onclick="resolve(${d.id}, ${i})">
+            <b>${o.label || o.option || o.slot_id || ('Option ' + (i+1))}</b>
+            <small>${o.why || o.detail || o.details || ''}</small>
+          </button>`).join('')}
+      </div>
+    </div>`).join('');
+  window._decisions = decisions;
+}
+
+async function resolve(id, idx) {
+  const d = window._decisions.find(x => x.id === id);
+  await fetch(`/api/decisions/${id}/resolve`, {
+    method: 'POST', headers: {'content-type': 'application/json'},
+    body: JSON.stringify({choice: d.options[idx]}),
+  });
+  refresh();
+}
+
+function renderFeed(activity) {
+  $('feed').innerHTML = activity.slice().reverse().map(e => {
+    const f = HUMAN[e.action];
+    if (f === null || f === undefined && e.action.startsWith('tool_')) return '';
+    const text = f ? f(e.detail || {}) : e.action;
+    return `<div class="row"><time>${(e.ts||'').slice(11,19)}</time><span class="actor ${e.actor}">${e.actor}</span><span>${text}</span></div>`;
+  }).join('');
+}
+
+function renderGraph(g, docs) {
+  const svg = $('graph-svg');
+  const days = Object.fromEntries(docs.map(d => [d.doc_type, d.days_until_expiry]));
+  // order by dependency depth so arrows flow right: dependents first
+  const order = {driver_license: 0, lawful_status: 1, passport: 2};
+  const nodes = [...g.nodes].sort((a, b) => (order[a.id] ?? 5) - (order[b.id] ?? 5));
+  const n = nodes.length || 1;
+  const pos = {};
+  nodes.forEach((node, i) => { pos[node.id] = {x: 140 + i * (720 / Math.max(n-1, 1)), y: 110}; });
+  let out = '';
+  for (const e of g.edges) {
+    const a = pos[e.from], b = pos[e.to];
+    if (!a || !b) continue;
+    const mx = (a.x + b.x) / 2;
+    const lift = 60 + Math.abs(b.x - a.x) / 14;
+    out += `<path d="M ${a.x} ${a.y-34} C ${mx} ${a.y-lift-30}, ${mx} ${b.y-lift-30}, ${b.x} ${b.y-34}" fill="none" stroke="#b3331d" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arr)"/>`;
+    out += `<text x="${mx}" y="${a.y-lift-16}" text-anchor="middle" font-size="11" fill="#78716c">${e.label}</text>`;
+  }
+  out = `<defs><marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#b3331d"/></marker></defs>` + out;
+  for (const node of nodes) {
+    const p = pos[node.id];
+    const d = days[node.id];
+    const color = d < 60 ? '#b3331d' : d < 240 ? '#a05f08' : '#2f7d4f';
+    out += `<rect x="${p.x-95}" y="${p.y-34}" width="190" height="68" rx="12" fill="#fffdf9" stroke="${color}" stroke-width="1.5"/>`;
+    out += `<text x="${p.x}" y="${p.y-4}" text-anchor="middle" font-size="14" font-weight="600" font-family="Georgia">${node.label}</text>`;
+    out += `<text x="${p.x}" y="${p.y+18}" text-anchor="middle" font-size="11" fill="${color}" font-family="monospace">${node.expiry}</text>`;
+  }
+  svg.innerHTML = out;
+}
+
+function renderTimeline(marks) {
+  if (!marks || !marks.length) {
+    $('timeline').innerHTML = '<span class="inbox-empty">No time pressure right now.</span>';
+    return;
+  }
+  $('timeline').innerHTML = marks.map(m => `
+    <div class="mark ${m.kind === 'travel' ? 'travel' : ''}">
+      <div class="dot"></div>
+      <div class="lab">${m.label}</div>
+      <div class="dat">${m.date}</div>
+    </div>`).join('');
+}
+
+async function runWake() {
+  await fetch('/api/wake', {method: 'POST'});
+  $('log-h2').style.display = 'block';
+  $('log-panel').classList.add('on');
+  pollLog();
+}
+
+async function pollLog() {
+  const w = await (await fetch('/api/wake/log')).json();
+  $('log-panel').textContent = w.log;
+  $('log-panel').scrollTop = 1e9;
+  if (w.running) setTimeout(pollLog, 800); else refresh();
+}
+
+function renderWake(w) {
+  const btn = $('wake-btn');
+  btn.disabled = w.running;
+  btn.textContent = w.running ? 'Working…' : 'Run a check';
+  btn.classList.toggle('live', w.running);
+}
+
+async function confirmDoc(id) {
+  await fetch(`/api/documents/${id}/confirm`, {method: 'POST'});
+  refresh();
+}
+
+async function uploadDoc(input) {
+  const f = input.files[0]; if (!f) return;
+  const fd = new FormData(); fd.append('file', f);
+  const r = await fetch('/api/documents/upload', {method: 'POST', body: fd});
+  const j = await r.json();
+  if (!r.ok) alert(j.detail || 'could not read that document');
+  input.value = '';
+  refresh();
+}
+
+setInterval(refresh, 4000);
+refresh();
+</script>
+</body>
+</html>
