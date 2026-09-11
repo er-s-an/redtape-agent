@@ -5,8 +5,9 @@
 // Usage: node record.mjs   (expects mockgov :9100, redtape :9200, fresh seeded persona)
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
-const RAW = new URL('./raw/', import.meta.url).pathname;
+const RAW = fileURLToPath(new URL('./raw/', import.meta.url));
 fs.rmSync(RAW, { recursive: true, force: true });
 fs.mkdirSync(RAW, { recursive: true });
 
@@ -53,8 +54,10 @@ console.log('[2] saved decision.webm');
 s = await segment('execution');
 await s.p.goto('http://localhost:9200', { waitUntil: 'networkidle' });
 await s.p.evaluate(() => document.querySelector('#feed').scrollIntoView({ behavior: 'smooth' }));
+console.log('[3] waiting for execution wake to start…');
+await s.p.waitForFunction(() => document.querySelector('#wake-btn').disabled, undefined, { timeout: 3 * 60 * 1000 });
 console.log('[3] execution wake running…');
-await s.p.waitForFunction(() => !document.querySelector('#wake-btn').disabled, { timeout: 12 * 60 * 1000 });
+await s.p.waitForFunction(() => !document.querySelector('#wake-btn').disabled, undefined, { timeout: 12 * 60 * 1000 });
 await s.p.waitForTimeout(4000);
 await s.p.evaluate(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
 await s.p.waitForTimeout(3000);

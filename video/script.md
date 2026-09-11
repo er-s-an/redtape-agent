@@ -14,36 +14,35 @@ cascades: you can't renew your license without your passport, and your passport 
 sitting at a consulate for eight weeks. Reminder apps tell you a date is coming.
 Nothing guards the chain. RedTape does."
 
-## S3 · demo wake (footage, ~55s at 8x)
+## S3 · demo wake (footage, ~50s at 8x)
 "RedTape runs in the background — no app to babysit. We're triggering one of its
 scheduled checks. It scans the document ledger, re-verifies the rules at the source,
-and notices what a human would miss: a trip home in December requires six months of
-passport validity — and this passport falls two months short."
+and catches what a human would miss: an urgent family trip on November twentieth
+requires six months of passport validity — and this passport expires in April."
 
-## S4 · plan (card, ~14s)
-"It computes deadlines backwards: when the new passport must be in hand, minus eight
-weeks of processing, minus the appointment lead. Submit by October eighteenth.
-Book by October eleventh."
+## S4 · plan (card, ~16s)
+"It computes deadlines backwards: in hand by November thirteenth, minus eight weeks
+of processing — regular handling means submitting by mid-September. The earliest
+consulate slot is October third. Regular processing cannot make it."
 
-## S5 · autonomous work (footage, ~35s at 6x)
-"Then it does the safe work itself. It finds the conflict — surrendering the passport
-would block the license renewal — so it sequences: license first, on September
-twenty-second. Then the consulate appointment, October third. Forms pre-filled.
-Calendar held. Every action written to an auditable ledger."
+## S5 · autonomous work (footage, ~30s at 6x)
+"It still does the safe work: the renewal plan computed, the application pre-filled
+as a draft. But it books nothing — no slot can make the regular deadline, and its
+guardrails will not let it gamble on a late one."
 
 ## S6 · decision (card, ~10s)
-"But when a choice costs money and trades off risk — it stops, and asks. Once."
+"When no regular path is safe, it doesn't gamble — it stops, and asks. Once."
 
-## S7 · decision inbox (footage, ~30s, real-time)
-"Regular processing: twenty-three dollars, five days of margin. Expedited:
-eighty-three dollars, five weeks of margin. That call is yours. You choose —
-and RedTape executes."
+## S7 · decision inbox (footage, ~28s, real-time)
+"One viable path: expedited processing, October seventeenth, eighty-three dollars —
+in hand around November fourteenth, six days before the trip. You approve it.
+The guardrail verifies the approval — and RedTape books."
 
 ## S8 · trust (card + numbers, ~22s)
 "Underneath: Strands agents hooks cancel unsafe actions before they run. A steering
-buddy reviews every tool call. Sessions survive restarts. And in evaluation:
-scripted scenarios across jurisdictions — all passing, with zero unauthorized
-submissions."
+buddy reviews every tool call. Sessions survive restarts. Every action is
+hash-chained in an auditable ledger. And scripted evaluations across scenarios pass
+with zero unauthorized submissions."
 
 ## S9 · close (card, ~10s)
 "RedTape. Built with the Strands Agents SDK. For everyone whose life spans borders.

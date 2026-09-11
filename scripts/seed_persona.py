@@ -36,10 +36,10 @@ def main() -> None:
         "fields": {"basis": "H-1B"},
     })
     (DATA_DIR / "events.json").write_text(json.dumps([
-        {"kind": "travel", "date": "2026-12-20",
-         "description": "fly home for New Year", "needs": {"passport": True}},
+        {"kind": "travel", "date": "2026-11-20",
+         "description": "urgent family trip home", "needs": {"passport": True}},
     ], indent=2))
-    print("seeded: passport, driver_license, lawful_status + travel event 2026-12-20")
+    print("seeded: passport, driver_license, lawful_status + travel event 2026-11-20")
 
 
 if __name__ == "__main__":

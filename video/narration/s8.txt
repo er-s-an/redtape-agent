@@ -1,1 +1,1 @@
-Underneath: Strands agents hooks cancel unsafe actions before they run. A steering buddy reviews every tool call. Sessions survive restarts. And in evaluation: scripted scenarios across jurisdictions — all passing, with zero unauthorized submissions.
+Underneath: Strands agents hooks cancel unsafe actions before they run. A steering buddy reviews every tool call. Sessions survive restarts. Every action is hash-chained in an auditable ledger. And scripted evaluations across scenarios pass with zero unauthorized submissions.

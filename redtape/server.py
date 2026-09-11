@@ -121,7 +121,14 @@ class ResolveRequest(BaseModel):
 @app.post("/api/decisions/{decision_id}/resolve")
 def resolve(decision_id: int, req: ResolveRequest) -> dict:
     store().resolve_decision(decision_id, req.choice, by="human")
-    wake()  # a resolved decision immediately wakes the agent to execute it
+
+    def _wake_when_free() -> None:
+        import time
+        while _wake_state["running"]:
+            time.sleep(2)
+        wake()
+
+    threading.Thread(target=_wake_when_free, daemon=True).start()
     return {"ok": True}
 
 

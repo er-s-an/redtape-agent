@@ -60,6 +60,11 @@ class Guardrails(HookProvider):
             event.cancel_tool = "no passport on file — nothing to renew"
             c.store.log("hook", "booking_blocked", {"slot_id": slot_id, "why": "no passport"})
             return
+        if not passport.get("confirmed"):
+            event.cancel_tool = ("passport data is not confirmed by the human yet — "
+                                 "request confirmation (decision kind confirm_document) before acting on it")
+            c.store.log("hook", "booking_blocked", {"slot_id": slot_id, "why": "passport unconfirmed"})
+            return
         with httpx.Client(base_url=c.mockgov_base, timeout=15, trust_env=False) as h:
             rule = h.get(f"/api/rules/{passport['jurisdiction']}/passport").json()
         events = _load_events(c)
@@ -100,7 +105,7 @@ class Guardrails(HookProvider):
         import json
         c = ctx()
         rows = c.store.conn.execute(
-            "SELECT resolution FROM decisions WHERE status = 'resolved' AND kind = 'pick_slot'"
+            "SELECT resolution FROM decisions WHERE status IN ('resolved', 'executed')"
         ).fetchall()
         for row in rows:
             choice = json.loads(row["resolution"]).get("choice", {})

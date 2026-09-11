@@ -174,7 +174,7 @@ function renderInbox(decisions) {
         ${d.options.map((o, i) => `
           <button class="opt" onclick="resolve(${d.id}, ${i})">
             <b>${o.label || o.option || o.slot_id || ('Option ' + (i+1))}</b>
-            <small>${o.why || o.detail || o.details || ''}</small>
+            <small>${(() => { const t = o.why || o.detail || o.details || ''; return typeof t === 'string' ? t : JSON.stringify(t); })()}</small>
           </button>`).join('')}
       </div>
     </div>`).join('');

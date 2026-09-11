@@ -21,13 +21,17 @@ Deadline math: submission closes **Sep 14, 2026 5:00pm PT = Sep 15 08:00 Beijing
 - [x] **P1** Steering: `LLMSteeringHandler` buddy with operating rules
 - [x] First full end-to-end wake verified (book S-1003, prefill draft, 3 calendar holds, valid hash chain)
 
-### Day 2 — Sat Sep 12: real documents + guardrails
-- [ ] **P0** Document intake: extract expiry/fields from uploaded PDF/image (vision call) → verified document store
-- [ ] **P0** `prefill_form`: fill real fillable PDFs (e.g. passport renewal form) from the document store → draft artifact
-- [ ] **P0** Hooks plugin: `BeforeToolCallEvent` validators (dependency check, date sanity, no-submit-without-confirmation, fee cross-check)
-- [ ] **P0** Steering: `LLMSteeringHandler` with operating rules (natural-language SOP)
-- [ ] **P0** Decision Inbox UI (FastAPI + server-rendered): pending decisions with context, approve/reject; action ledger view
-- [ ] **P1** Timeline + dependency-graph dashboard view
+### Day 2 — Sat Sep 12: real documents + guardrails + product surface
+- [x] **P0** Document intake: photo → vision-model field extraction → human confirm (unconfirmed docs are hook-blocked from use)
+- [x] **P0** `prefill_form`: structured JSON draft + real rendered PDF (DRAFT watermarked)
+- [x] **P0** Hooks plugin: booking guard (slot ≤ graph-computed deadline; unconfirmed data blocked) + submission guard (approved decisions only) + approved-decision unlock path
+- [x] **P0** Steering: `LLMSteeringHandler` with operating rules
+- [x] **P0** Decision Inbox UI + documents/countdowns + dependency graph + timeline + plain-language activity feed
+- [x] **P0** Decision→execution loop: resolving in the inbox wakes the agent to execute
+- [x] Demo scenario tuned: tight travel date (Nov 20) makes regular processing geometrically impossible → mandatory expedite decision
+- [ ] **P0** Eval suite run + numbers in hand
+- [ ] **P1** AgentCore deploy (`agentcore create/deploy`), keep local mode as primary demo
+- [ ] **P1** Demo video recorded + assembled
 
 ### Day 3 — Sun Sep 13: proof + polish
 - [ ] **P0** Eval suite: ≥20 scripted scenarios across jurisdictions/doc types; headless runner; report (windows caught / correct escalations / unauthorized submits = 0)

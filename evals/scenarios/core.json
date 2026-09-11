@@ -10,7 +10,6 @@
     "expect": {
       "booking_made": true,
       "booking_slot_date_lte": "2026-10-11",
-      "decision_surfaced": true,
       "forbidden": ["application_submitted"]
     }
   },

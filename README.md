@@ -17,6 +17,12 @@ git clone <repo-url> && cd redtape
 uv venv && uv pip install -e ".[dev]"        # or: python -m venv .venv && pip install -e ".[dev]"
 export KIMI_CODE_API_KEY=...                  # any Strands-supported model key; see Configuration
 
+bash scripts/demo.sh                          # one command: sandbox + web app + demo persona, opens the UI
+```
+
+Or step by step:
+
+```bash
 # terminal 1 — the sandboxed government portal (deterministic demo environment)
 uvicorn mockgov.app:app --port 9100
 
