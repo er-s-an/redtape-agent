@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  body { margin:0; width:1440px; height:900px; display:flex; flex-direction:column;
+         justify-content:center; align-items:center; background:#faf7f2; color:#1c1917;
+         font-family:-apple-system,"SF Pro Text",sans-serif; text-align:center; }
+  .kicker { font:600 13px ui-monospace,Menlo,monospace; letter-spacing:.18em;
+            text-transform:uppercase; color:#b3331d; margin-bottom:22px; }
+  .main { font:700 52px/1.25 Georgia,"Times New Roman",serif; max-width:1000px; }
+  .main em { color:#b3331d; font-style:normal; }
+  .sub { margin-top:26px; font-size:20px; color:#78716c; max-width:860px; line-height:1.6; }
+  .stat { font:700 64px Georgia,serif; color:#b3331d; }
+</style></head>
+<body id="card"></body>
+<script>
+const cards = {
+  title: `<div class="main">Red<em>Tape</em></div>
+          <div class="sub">an agent for the paperwork of a life across borders</div>`,
+  problem: `<div class="kicker">the problem</div>
+    <div class="main" style="font-size:40px">Your documents are a <em>chain</em>.<br>Miss one window — the chain breaks.</div>
+    <div class="sub">passport → visa → status → license · every renewal has a window,<br>a lead time, and a wait · reminders tell you a date — nothing guards the chain</div>`,
+  plan: `<div class="kicker">backward planning</div>
+    <div class="main" style="font-size:40px">Deadlines computed <em>backwards</em></div>
+    <div class="sub">in-hand-by − 8 weeks processing − appointment lead<br><b>submit by Oct 18 · book by Oct 11</b></div>`,
+  decision: `<div class="kicker">your call</div>
+    <div class="main" style="font-size:40px">When a choice costs money<br>or trades off risk — <em>it stops and asks. Once.</em></div>`,
+  trust: `<div class="kicker">deterministic by design</div>
+    <div class="main" style="font-size:36px">hooks cancel unsafe actions before they run<br>steering reviews every tool call<br>every action hash-chained in the ledger</div>
+    <div class="sub" id="eval-line">evaluation: scripted scenarios · zero unauthorized submissions</div>`,
+  close: `<div class="main">Red<em>Tape</em></div>
+    <div class="sub">built with the Strands Agents SDK · the paperwork watches itself now</div>`,
+};
+document.getElementById('card').innerHTML = cards[new URLSearchParams(location.search).get('c') || 'title'];
+</script>
+</html>

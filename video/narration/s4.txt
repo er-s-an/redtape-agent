@@ -1,0 +1,1 @@
+It computes deadlines backwards: when the new passport must be in hand, minus eight weeks of processing, minus the appointment lead. Submit by October eighteenth. Book by October eleventh.

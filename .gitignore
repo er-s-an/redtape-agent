@@ -12,3 +12,9 @@ build/
 redtape_data/
 mockgov_data/
 evals/reports/
+video/node_modules/
+video/raw/
+video/seg/
+video/out/
+video/package*.json
+video/shot-*.png

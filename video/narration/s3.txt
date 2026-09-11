@@ -1,0 +1,1 @@
+RedTape runs in the background — no app to babysit. We're triggering one of its scheduled checks. It scans the document ledger, re-verifies the rules at the source, and notices what a human would miss: a trip home in December requires six months of passport validity — and this passport falls two months short.
