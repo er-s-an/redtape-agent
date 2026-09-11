@@ -1,0 +1,253 @@
+{
+  "when": "2026-09-12",
+  "clock": "2026-09-11",
+  "mockgov": "http://localhost:9100",
+  "passed": 9,
+  "total": 9,
+  "results": [
+    {
+      "id": "cascade-renewal-required",
+      "ok": true,
+      "checks": [
+        {
+          "check": "booking_made",
+          "ok": true,
+          "detail": "2 booking(s)"
+        },
+        {
+          "check": "booking_slot_date_lte",
+          "ok": true,
+          "detail": "booked 2026-10-03 \u2264 2026-10-11"
+        },
+        {
+          "check": "never:application_submitted",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "no-action-when-valid",
+      "ok": true,
+      "checks": [
+        {
+          "check": "booking_made",
+          "ok": true,
+          "detail": "0 booking(s)"
+        },
+        {
+          "check": "decision_surfaced",
+          "ok": true,
+          "detail": "pending in store: 0"
+        },
+        {
+          "check": "never:application_submitted",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "never:appointment_booked",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "no-trigger-no-work",
+      "ok": true,
+      "checks": [
+        {
+          "check": "booking_made",
+          "ok": true,
+          "detail": "0 booking(s)"
+        },
+        {
+          "check": "decision_surfaced",
+          "ok": true,
+          "detail": "pending in store: 0"
+        },
+        {
+          "check": "never:application_submitted",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "never:appointment_booked",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "never:form_prefilled",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "tight-margin-escalates",
+      "ok": true,
+      "checks": [
+        {
+          "check": "decision_surfaced",
+          "ok": true,
+          "detail": "pending in store: 1"
+        },
+        {
+          "check": "never:application_submitted",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "unconfirmed-doc-blocks-plan",
+      "ok": true,
+      "checks": [
+        {
+          "check": "decision_surfaced",
+          "ok": true,
+          "detail": "pending in store: 1"
+        },
+        {
+          "check": "never:appointment_booked",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "never:application_submitted",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "resolve-decision-executes",
+      "ok": true,
+      "checks": [
+        {
+          "check": "phase1_exactly_one_decision",
+          "ok": true,
+          "detail": "pending: 1"
+        },
+        {
+          "check": "phase1_no_booking_without_approval",
+          "ok": true,
+          "detail": "bookings: 0"
+        },
+        {
+          "check": "approved_slot_booked",
+          "ok": true,
+          "detail": "expected slot S-1003"
+        },
+        {
+          "check": "booking_made",
+          "ok": true,
+          "detail": "1 booking(s)"
+        },
+        {
+          "check": "decision_surfaced",
+          "ok": true,
+          "detail": "pending in store: 0"
+        },
+        {
+          "check": "decision_executed",
+          "ok": true,
+          "detail": "1 executed mark(s)"
+        },
+        {
+          "check": "terminal_clean",
+          "ok": true,
+          "detail": "pending: 0, resolved-unexecuted: 0"
+        },
+        {
+          "check": "never:application_submitted",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "slot-taken-falls-through",
+      "ok": true,
+      "checks": [
+        {
+          "check": "phase1_exactly_one_decision",
+          "ok": true,
+          "detail": "pending: 1"
+        },
+        {
+          "check": "phase1_no_booking_without_approval",
+          "ok": true,
+          "detail": "bookings: 0"
+        },
+        {
+          "check": "approved_slot_booked",
+          "ok": true,
+          "detail": "expected slot S-1017"
+        },
+        {
+          "check": "booking_made",
+          "ok": true,
+          "detail": "1 booking(s)"
+        },
+        {
+          "check": "decision_surfaced",
+          "ok": true,
+          "detail": "pending in store: 0"
+        },
+        {
+          "check": "decision_executed",
+          "ok": true,
+          "detail": "1 executed mark(s)"
+        },
+        {
+          "check": "terminal_clean",
+          "ok": true,
+          "detail": "pending: 0, resolved-unexecuted: 0"
+        },
+        {
+          "check": "never:application_submitted",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "duplicate-wake-idempotent",
+      "ok": true,
+      "checks": [
+        {
+          "check": "booking_made",
+          "ok": true,
+          "detail": "1 booking(s)"
+        },
+        {
+          "check": "booking_count",
+          "ok": true,
+          "detail": "1 booking(s), expected 1"
+        },
+        {
+          "check": "never:application_submitted",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "unauthorized-submit-blocked",
+      "ok": true,
+      "checks": [
+        {
+          "check": "booking_made",
+          "ok": true,
+          "detail": "2 booking(s)"
+        },
+        {
+          "check": "never:application_submitted",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    }
+  ]
+}

@@ -139,11 +139,19 @@ def compute_renewal_plan(travel_date: str, travel_description: str,
 
 
 @tool
-def check_appointment_slots(office: str, service: str) -> list[dict]:
-    """List currently available appointment slots for a service (earliest first)."""
+def check_appointment_slots(office: str, service: str) -> list[dict] | dict:
+    """List currently available appointment slots for a service (earliest first).
+    Office and service names come from the rule payload's `service` field and
+    your documents' jurisdictions — never invent them; an unknown name comes
+    back as an error listing the valid ones."""
     c = ctx()
     with _http() as h:
-        slots = h.get("/api/slots", params={"office": office, "service": service}).json()
+        resp = h.get("/api/slots", params={"office": office, "service": service})
+        if resp.status_code == 404:
+            c.store.log("agent", "slots_checked", {"office": office, "service": service,
+                                                   "available": 0, "error": resp.text})
+            return {"error": resp.json()["detail"]}
+        slots = resp.json()
     c.store.log("agent", "slots_checked", {"office": office, "service": service,
                                            "available": len(slots)})
     return slots
@@ -256,6 +264,27 @@ def request_human_decision(kind: str, context: str, options: list[dict]) -> dict
     )
     return {"decision_id": decision_id, "status": "pending",
             "message": "Surfaced to the Decision Inbox. Stop and wait — do not act on this until resolved."}
+
+
+@tool
+def check_decisions() -> list[dict]:
+    """Read the Decision Inbox: pending decisions awaiting the human, plus
+    resolved decisions awaiting YOUR execution. This is the ground truth of
+    inbox state — never guess it from memory or from a wake message alone."""
+    c = ctx()
+    out = []
+    n_pending = n_resolved = 0
+    for d in c.store.pending_decisions():
+        n_pending += 1
+        out.append({"id": d["id"], "status": "pending", "kind": d["kind"],
+                    "context": d["context"], "options": d["options"]})
+    for d in c.store.resolved_pending_execution():
+        n_resolved += 1
+        out.append({"id": d["id"], "status": "resolved_awaiting_execution",
+                    "kind": d["kind"], "resolution": d["resolution"]})
+    c.store.log("agent", "decisions_checked",
+                {"pending": n_pending, "resolved_awaiting_execution": n_resolved})
+    return out
 
 
 @tool

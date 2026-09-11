@@ -30,9 +30,11 @@ NUDGE = (
 
 NUDGE_EXEC = (
     "Protocol check: the human has resolved decisions that are not marked "
-    "executed yet. Finish the follow-through NOW: carry out each chosen option "
-    "if not already done, then call mark_decision_executed for every resolved "
-    "decision. Do not end your turn before those tool calls."
+    "executed yet. Read the resolved decisions with check_decisions, finish "
+    "the follow-through NOW: carry out each chosen option if not already done "
+    "(book the exact slot named in the choice — the guardrail unlocks it), "
+    "then call mark_decision_executed for every resolved decision. Do not end "
+    "your turn before those tool calls."
 )
 
 

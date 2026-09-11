@@ -139,6 +139,13 @@ def get_rule(jurisdiction: str, doc_type: str) -> Rule:
 
 @app.get("/api/slots")
 def list_slots(office: str, service: str, after: str | None = None) -> list[dict]:
+    known = {s["service"] for s in _SLOTS.values() if s["office"] == office}
+    if not known:
+        raise HTTPException(404, f"unknown office {office!r}; known offices: "
+                                 f"{sorted({s['office'] for s in _SLOTS.values()})}")
+    if service not in known:
+        raise HTTPException(404, f"unknown service {service!r} at {office}; "
+                                 f"known services: {sorted(known)}")
     after_date = date.fromisoformat(after) if after else TODAY
     return [
         {"slot_id": sid, **s}
@@ -196,6 +203,19 @@ def submission_status(case_id: str) -> dict:
     if case is None:
         raise HTTPException(404, "unknown case")
     return case
+
+
+@app.post("/api/admin/reset")
+def reset_state() -> dict:
+    """Restore the pristine sandbox state: every slot free, no bookings, no
+    cases. Rules are left untouched. Used by the eval runner for per-scenario
+    isolation and by demos that want a clean slate."""
+    with _lock:
+        _BOOKINGS.clear()
+        _CASES.clear()
+        for slot in _SLOTS.values():
+            slot["taken"] = False
+    return {"ok": True, "slots_free": len(_SLOTS)}
 
 
 @app.post("/api/admin/rules/{jurisdiction}/{doc_type}/bump")

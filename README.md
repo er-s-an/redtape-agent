@@ -13,7 +13,7 @@ Reminder apps tell you a date is coming. RedTape computes your deadlines *backwa
 ## See it run
 
 ```bash
-git clone <repo-url> && cd redtape
+git clone https://github.com/er-s-an/redtape-agent.git && cd redtape-agent
 uv venv && uv pip install -e ".[dev]"        # or: python -m venv .venv && pip install -e ".[dev]"
 export KIMI_CODE_API_KEY=...                  # any Strands-supported model key; see Configuration
 
@@ -31,7 +31,7 @@ python scripts/seed_persona.py                # synthetic demo persona, no real 
 uvicorn redtape.server:app --port 9200        # open http://localhost:9200
 ```
 
-Press **Run a check** in the UI. RedTape scans the document ledger, re-verifies the rules, computes the backward-chained plan, books a valid appointment, pre-fills the application (JSON + PDF draft), places calendar holds — and if a choice is irreversible or costs money, it stops and asks you in the **Decision Inbox**.
+Press **Run a check** in the UI. RedTape scans the document ledger, re-reads the sandbox portal's versioned rules, computes the backward-chained plan, books a valid appointment, pre-fills the application (JSON + a reviewable PDF draft, watermarked **DRAFT — NOT SUBMITTED**), places calendar holds — and if a choice is irreversible or costs money, it stops and asks you in the **Decision Inbox**.
 
 ![The dashboard: document chain, backward-chained timeline, and a decision that needs you](assets/dashboard.png)
 
@@ -44,7 +44,7 @@ The demo environment (`mockgov/`) simulates the consulate/DMV portal so the whol
 - **Deterministic guardrails** — Strands **hooks** cancel any booking that lands after the graph-computed safe date, and cancel any application submission not explicitly approved by you; an approved decision unlocks exactly the slots it names (even when the model buries the slot id in prose). Watch the hook fire in the Activity feed.
 - **A steering buddy** — Strands' `LLMSteeringHandler` reviews each tool call against natural-language operating rules and guides the agent back when it drifts. RedTape subclasses it to degrade "interrupt for human" decisions into guidance: a background agent must never suspend mid-turn waiting for a human — the Decision Inbox is the only human-input channel.
 - **Auditable everything** — every action lands in a hash-chained ledger you can verify (`verify_ledger()`); sessions persist across restarts via `SnapshotSessionManager`. The store runs in WAL mode with serialized access, so the web server, daemon, and CLI checks can share one database without starving each other's writes.
-- **Photo intake** — point a camera at a document; the vision model extracts the fields, you confirm, the agent takes it from there.
+- **Photo intake** — point a camera at a document; the vision model extracts the fields, you confirm, the agent takes it from there. (The photo is sent to the configured vision provider — Kimi in the demo — and stored locally until you delete it; nothing is trusted until you confirm.)
 
 ## Architecture
 
@@ -60,7 +60,14 @@ scheduler ── wakes ──▶ Strands agent ──▶ tools: documents · rul
 
 ## Evaluation
 
-`python -m evals.run` drives scripted scenarios (cascade required, no-action-when-valid, tight margins, unconfirmed data, idle wake) against a fresh store and asserts on **outcome state** — bookings made within safe dates, escalations surfaced, and zero unauthorized submissions. Latest report: `evals/reports/last-run.json`.
+`python -m evals.run` (with the sandbox portal running on :9100) drives 9 scripted scenarios against a **fresh, isolated state per scenario** — a temp SQLite store, a reset sandbox (every slot free, no bookings), and a pinned clock — and asserts on **outcome state**, not model prose: bookings made within the graph-computed safe dates, exactly-once execution after a human resolves a decision, no booking at all when the best slot is taken until a human approves a choice, no double-booking on a duplicate trigger, escalations surfaced, and zero unauthorized submissions. Latest report: `evals/reports/last-run.json`.
+
+```bash
+python -m evals.run            # full suite → evals/reports/last-run.json
+python -m evals.run quick      # the 3 fastest scenarios
+```
+
+Set `EVAL_CLOCK=2026-09-11` to pin the planning date regardless of the host date (by default the suite uses the sandbox's own `TODAY`).
 
 ## Configuration
 
@@ -69,6 +76,10 @@ scheduler ── wakes ──▶ Strands agent ──▶ tools: documents · rul
 | `KIMI_CODE_API_KEY` | — | model key (dev/demo default: Kimi K2.7) |
 | `REDTAPE_PROVIDER` | `kimi` | `kimi` or `bedrock` (AgentCore path) |
 | `REDTAPE_MODEL_ID` | `kimi-for-coding` | model override |
+| `MOCKGOV_TODAY` | `2026-09-11` | the sandbox's "today" — pin it to keep demo dates stable |
+| `EVAL_CLOCK` | sandbox `TODAY` | the eval suite's planning date |
+
+Note on providers: the agent loop works with any Strands-supported text model (the provider is one env var away), but **photo intake currently calls Kimi's vision endpoint directly** — with another provider, document entry falls back to manual form entry. The `bedrock` provider path is wired but the AgentCore deployment is optional and not part of this repo's local demo.
 
 ## License
 
