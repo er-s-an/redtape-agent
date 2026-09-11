@@ -115,8 +115,12 @@ const HUMAN = {
   slots_checked: d => `Checked appointment availability (${d.available} slot(s) open)`,
   appointment_booked: d => `Booked appointment ${d.slot_id} — confirmation ${d.confirmation}`,
   booking_failed: d => `Booking failed for ${d.slot_id}: ${d.reason}`,
-  booking_allowed: d => `Guardrail: ${d.slot_id} within safe window (latest ${d.latest_safe})`,
-  booking_blocked: d => `Guardrail blocked booking ${d.slot_id}: ${d.why || ''}`,
+  booking_allowed: d => d.via
+    ? `Guardrail: booking ${d.slot_id} unlocked — ${d.via}`
+    : `Guardrail: ${d.slot_id} within safe window (latest ${d.latest_safe})`,
+  booking_blocked: d => d.why
+    ? `Guardrail blocked booking ${d.slot_id}: ${d.why}`
+    : `Guardrail blocked booking ${d.slot_id} (${d.slot_date} is past the latest safe date ${d.latest_safe})`,
   submission_blocked: d => `Guardrail blocked submission of ${d.doc_type} — needs your approval`,
   submission_allowed: d => `Guardrail: submission of ${d.doc_type} approved by you`,
   form_prefilled: d => `Pre-filled ${d.doc_type} application draft (rules v${d.rule_version})`,

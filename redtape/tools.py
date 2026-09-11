@@ -133,6 +133,7 @@ def compute_renewal_plan(travel_date: str, travel_description: str,
                                     "conflicts": license_plan.conflicts}
     c.store.log("agent", "plan_computed", {"travel_date": travel_date,
                                            "steps": len(travel_plan.steps),
+                                           "actions": [s.action for s in travel_plan.steps],
                                            "conflicts": len(travel_plan.conflicts)})
     return result
 
@@ -243,7 +244,10 @@ def submit_application(jurisdiction: str, doc_type: str, draft_path: str) -> dic
 def request_human_decision(kind: str, context: str, options: list[dict]) -> dict:
     """Surface a decision to the human. Use ONLY when the choice is genuinely
     theirs: irreversible actions, preference tradeoffs, anything costing money.
-    Options carry concrete dates/margins so the human can decide in one look."""
+    Options carry concrete dates/margins so the human can decide in one look.
+    Every option that involves a booking MUST include a top-level "slot_id"
+    field (e.g. {"label": ..., "slot_id": "S-1003"}) — the guardrail unlocks
+    that exact slot on approval."""
     c = ctx()
     decision_id = c.store.create_decision(
         kind,

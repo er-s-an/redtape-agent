@@ -103,13 +103,21 @@ class Guardrails(HookProvider):
 
     def _approved_decision_covers(self, slot_id: str) -> bool:
         import json
+        import re
         c = ctx()
         rows = c.store.conn.execute(
             "SELECT resolution FROM decisions WHERE status IN ('resolved', 'executed')"
         ).fetchall()
+        slot_re = re.compile(r"\b[A-Z]-\d{3,4}\b")
         for row in rows:
             choice = json.loads(row["resolution"]).get("choice", {})
-            if choice.get("slot_id") == slot_id:
+            covered = choice.get("slot_ids") or (
+                [choice["slot_id"]] if choice.get("slot_id") else []
+            )
+            if not covered:  # models sometimes bury the slot id in prose — dig it out
+                for value in choice.values():
+                    covered.extend(slot_re.findall(value) if isinstance(value, str) else [])
+            if slot_id in covered:
                 return True
         return False
 

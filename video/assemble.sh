@@ -7,7 +7,7 @@ mkdir -p seg out
 VOICE="${REDTAPE_VOICE:-Samantha}"
 RATE=195
 
-say_seg() { say -v "$VOICE" -r "$RATE" -o "seg/$1.aiff" --data-format=LEF32@22050 -f "narration/$1.txt"
+say_seg() { say -v "$VOICE" -r "$RATE" -o "seg/$1.aiff" -f "narration/$1.txt"
             ffmpeg -y -loglevel error -i "seg/$1.aiff" -ar 44100 -ac 2 "seg/$1.wav"; }
 dur() { ffprobe -v error -show_entries format=duration -of csv=p=0 "$1"; }
 
@@ -46,8 +46,8 @@ HALF=$(awk "BEGIN{printf \"%.1f\", $WAKE_LEN * 0.45}")
 make_footage s3 raw/wake.webm 0 8 s3
 make_footage s5 raw/wake.webm "$HALF" 6 s5
 D7=$(dur "seg/s7.wav")
-ffmpeg -y -loglevel error -i raw/decision.webm -filter_complex "[0:v]setpts=PTS/1,$SCALE[v]" -an -c:v libx264 -pix_fmt yuv420p "seg/s7a_v.mp4"
-ffmpeg -y -loglevel error -i raw/execution.webm -filter_complex "[0:v]setpts=PTS/5,$SCALE[v]" -an -c:v libx264 -pix_fmt yuv420p "seg/s7b_v.mp4"
+ffmpeg -y -loglevel error -i raw/decision.webm -filter_complex "[0:v]setpts=PTS/1,$SCALE[v]" -map "[v]" -an -c:v libx264 -pix_fmt yuv420p "seg/s7a_v.mp4"
+ffmpeg -y -loglevel error -ss 60 -i raw/execution.webm -filter_complex "[0:v]setpts=PTS/5,$SCALE[v]" -map "[v]" -an -c:v libx264 -pix_fmt yuv420p "seg/s7b_v.mp4"
 ffmpeg -y -loglevel error -i "seg/s7a_v.mp4" -i "seg/s7b_v.mp4" \
   -filter_complex "[0:v][1:v]concat=n=2:v=1[v]" -map "[v]" -c:v libx264 -pix_fmt yuv420p "seg/s7_v.mp4"
 ffmpeg -y -loglevel error -i "seg/s7_v.mp4" -i "seg/s7.wav" -map 0:v -map 1:a -t "$D7" \

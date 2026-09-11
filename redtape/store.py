@@ -2,12 +2,19 @@
 
 Every autonomous action the agent takes lands in the ledger as an append-only,
 hash-chained entry — the project's determinism/trust story made concrete.
+
+Thread safety: the Strands runtime may execute independent tool calls on
+parallel threads, and every tool writes through this one Store. sqlite3
+connections tolerate cross-thread use only when serialized, so all access is
+guarded by a reentrant lock (reentrant because higher-level operations call
+log() while already holding it).
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import sqlite3
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -55,107 +62,123 @@ class Store:
     def __init__(self, path: str | Path = "redtape_data/redtape.db"):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(str(self.path), check_same_thread=False)
+        self._lock = threading.RLock()
+        # WAL: the server, daemon, and CLI checks hit this file concurrently;
+        # rollback-journal mode lets one writer starve the others mid-cycle.
+        self.conn = sqlite3.connect(str(self.path), check_same_thread=False, timeout=30)
         self.conn.row_factory = sqlite3.Row
+        self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.executescript(_SCHEMA)
 
     def close(self) -> None:
-        self.conn.close()
+        with self._lock:
+            self.conn.close()
 
     # --- documents -------------------------------------------------------
 
     def add_document(self, doc: dict[str, Any]) -> int:
-        cur = self.conn.execute(
-            "INSERT INTO documents (doc_type, jurisdiction, number, expiry_date, holder_name, fields, confirmed)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (
-                doc["doc_type"], doc["jurisdiction"], doc["number"], doc["expiry_date"],
-                doc["holder_name"], json.dumps(doc.get("fields", {})), int(doc.get("confirmed", False)),
-            ),
-        )
-        self.conn.commit()
-        self.log("human" if doc.get("confirmed") else "agent", "document_added",
-                 {"doc_id": cur.lastrowid, "doc_type": doc["doc_type"]})
-        return cur.lastrowid
+        with self._lock:
+            cur = self.conn.execute(
+                "INSERT INTO documents (doc_type, jurisdiction, number, expiry_date, holder_name, fields, confirmed)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    doc["doc_type"], doc["jurisdiction"], doc["number"], doc["expiry_date"],
+                    doc["holder_name"], json.dumps(doc.get("fields", {})), int(doc.get("confirmed", False)),
+                ),
+            )
+            self.conn.commit()
+            self.log("human" if doc.get("confirmed") else "agent", "document_added",
+                     {"doc_id": cur.lastrowid, "doc_type": doc["doc_type"]})
+            return cur.lastrowid
 
     def list_documents(self) -> list[dict[str, Any]]:
-        rows = self.conn.execute("SELECT * FROM documents ORDER BY expiry_date").fetchall()
-        return [self._row(r, json_cols=("fields",)) for r in rows]
+        with self._lock:
+            rows = self.conn.execute("SELECT * FROM documents ORDER BY expiry_date").fetchall()
+            return [self._row(r, json_cols=("fields",)) for r in rows]
 
     def get_document_by_type(self, doc_type: str) -> dict[str, Any] | None:
-        row = self.conn.execute(
-            "SELECT * FROM documents WHERE doc_type = ? ORDER BY expiry_date DESC LIMIT 1", (doc_type,)
-        ).fetchone()
-        return self._row(row, json_cols=("fields",)) if row else None
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT * FROM documents WHERE doc_type = ? ORDER BY expiry_date DESC LIMIT 1", (doc_type,)
+            ).fetchone()
+            return self._row(row, json_cols=("fields",)) if row else None
 
     # --- decisions -------------------------------------------------------
 
     def create_decision(self, kind: str, context: dict[str, Any], options: list[dict[str, Any]]) -> int:
-        cur = self.conn.execute(
-            "INSERT INTO decisions (created_at, kind, context, options) VALUES (?, ?, ?, ?)",
-            (_utcnow(), kind, json.dumps(context), json.dumps(options)),
-        )
-        self.conn.commit()
-        self.log("agent", "decision_requested", {"decision_id": cur.lastrowid, "kind": kind})
-        return cur.lastrowid
+        with self._lock:
+            cur = self.conn.execute(
+                "INSERT INTO decisions (created_at, kind, context, options) VALUES (?, ?, ?, ?)",
+                (_utcnow(), kind, json.dumps(context), json.dumps(options)),
+            )
+            self.conn.commit()
+            self.log("agent", "decision_requested", {"decision_id": cur.lastrowid, "kind": kind})
+            return cur.lastrowid
 
     def pending_decisions(self) -> list[dict[str, Any]]:
-        rows = self.conn.execute(
-            "SELECT * FROM decisions WHERE status = 'pending' ORDER BY created_at"
-        ).fetchall()
-        return [self._row(r, json_cols=("context", "options")) for r in rows]
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT * FROM decisions WHERE status = 'pending' ORDER BY created_at"
+            ).fetchall()
+            return [self._row(r, json_cols=("context", "options")) for r in rows]
 
     def resolve_decision(self, decision_id: int, choice: Any, by: str = "human") -> None:
-        self.conn.execute(
-            "UPDATE decisions SET status = 'resolved', resolved_at = ?, resolution = ? WHERE id = ?",
-            (_utcnow(), json.dumps({"choice": choice, "by": by}), decision_id),
-        )
-        self.conn.commit()
-        self.log(by, "decision_resolved", {"decision_id": decision_id, "choice": choice})
+        with self._lock:
+            self.conn.execute(
+                "UPDATE decisions SET status = 'resolved', resolved_at = ?, resolution = ? WHERE id = ?",
+                (_utcnow(), json.dumps({"choice": choice, "by": by}), decision_id),
+            )
+            self.conn.commit()
+            self.log(by, "decision_resolved", {"decision_id": decision_id, "choice": choice})
 
     def resolved_pending_execution(self) -> list[dict[str, Any]]:
-        rows = self.conn.execute(
-            "SELECT * FROM decisions WHERE status = 'resolved' ORDER BY resolved_at"
-        ).fetchall()
-        return [self._row(r, json_cols=("context", "options", "resolution")) for r in rows]
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT * FROM decisions WHERE status = 'resolved' ORDER BY resolved_at"
+            ).fetchall()
+            return [self._row(r, json_cols=("context", "options", "resolution")) for r in rows]
 
     def mark_decision_executed(self, decision_id: int) -> None:
-        self.conn.execute("UPDATE decisions SET status = 'executed' WHERE id = ?", (decision_id,))
-        self.conn.commit()
-        self.log("agent", "decision_executed", {"decision_id": decision_id})
+        with self._lock:
+            self.conn.execute("UPDATE decisions SET status = 'executed' WHERE id = ?", (decision_id,))
+            self.conn.commit()
+            self.log("agent", "decision_executed", {"decision_id": decision_id})
 
     # --- ledger ----------------------------------------------------------
 
     def log(self, actor: str, action: str, detail: dict[str, Any]) -> dict[str, Any]:
-        prev = self.conn.execute("SELECT hash FROM ledger ORDER BY id DESC LIMIT 1").fetchone()
-        prev_hash = prev["hash"] if prev else GENESIS
-        ts = _utcnow()
-        body = json.dumps({"ts": ts, "actor": actor, "action": action, "detail": detail},
-                          sort_keys=True, ensure_ascii=False)
-        digest = hashlib.sha256((prev_hash + body).encode()).hexdigest()
-        self.conn.execute(
-            "INSERT INTO ledger (ts, actor, action, detail, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?)",
-            (ts, actor, action, json.dumps(detail, ensure_ascii=False), prev_hash, digest),
-        )
-        self.conn.commit()
-        return {"ts": ts, "actor": actor, "action": action, "hash": digest}
+        with self._lock:
+            prev = self.conn.execute("SELECT hash FROM ledger ORDER BY id DESC LIMIT 1").fetchone()
+            prev_hash = prev["hash"] if prev else GENESIS
+            ts = _utcnow()
+            body = json.dumps({"ts": ts, "actor": actor, "action": action, "detail": detail},
+                              sort_keys=True, ensure_ascii=False)
+            digest = hashlib.sha256((prev_hash + body).encode()).hexdigest()
+            self.conn.execute(
+                "INSERT INTO ledger (ts, actor, action, detail, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?)",
+                (ts, actor, action, json.dumps(detail, ensure_ascii=False), prev_hash, digest),
+            )
+            self.conn.commit()
+            return {"ts": ts, "actor": actor, "action": action, "hash": digest}
 
     def ledger_tail(self, n: int = 50) -> list[dict[str, Any]]:
-        rows = self.conn.execute("SELECT * FROM ledger ORDER BY id DESC LIMIT ?", (n,)).fetchall()
-        return [self._row(r, json_cols=("detail",)) for r in reversed(rows)]
+        with self._lock:
+            rows = self.conn.execute("SELECT * FROM ledger ORDER BY id DESC LIMIT ?", (n,)).fetchall()
+            return [self._row(r, json_cols=("detail",)) for r in reversed(rows)]
 
     def verify_ledger(self) -> bool:
-        rows = self.conn.execute("SELECT * FROM ledger ORDER BY id").fetchall()
-        prev_hash = GENESIS
-        for r in rows:
-            body = json.dumps({"ts": r["ts"], "actor": r["actor"], "action": r["action"],
-                               "detail": json.loads(r["detail"])}, sort_keys=True, ensure_ascii=False)
-            if r["prev_hash"] != prev_hash:
-                return False
-            prev_hash = hashlib.sha256((prev_hash + body).encode()).hexdigest()
-            if r["hash"] != prev_hash:
-                return False
-        return True
+        with self._lock:
+            rows = self.conn.execute("SELECT * FROM ledger ORDER BY id").fetchall()
+            prev_hash = GENESIS
+            for r in rows:
+                body = json.dumps({"ts": r["ts"], "actor": r["actor"], "action": r["action"],
+                                   "detail": json.loads(r["detail"])}, sort_keys=True, ensure_ascii=False)
+                if r["prev_hash"] != prev_hash:
+                    return False
+                prev_hash = hashlib.sha256((prev_hash + body).encode()).hexdigest()
+                if r["hash"] != prev_hash:
+                    return False
+            return True
 
     # --- helpers ---------------------------------------------------------
 

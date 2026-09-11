@@ -24,7 +24,7 @@ def run_scenario(scn: dict) -> dict:
     import httpx
     from redtape import tools
     from redtape.agent import build_agent
-    from redtape.daemon import wake
+    from redtape.daemon import _ledger_mark, _protocol_incomplete, _run_turn, wake
 
     tmp = Path(tempfile.mkdtemp(prefix=f"eval-{scn['id']}-"))
     store = Store(tmp / "redtape.db")
@@ -34,7 +34,13 @@ def run_scenario(scn: dict) -> dict:
 
     tools.init_context(store, MOCKGOV_BASE, date.today(), tmp)
     agent = build_agent(tmp, session_id=f"eval-{scn['id']}-{int(time.time())}")
-    agent(wake(date.today(), store))
+    mark = _ledger_mark(store)
+    _run_turn(agent, wake(date.today(), store, events=scn["events"]))
+    for _ in (1, 2):  # same completion nudge as the daemon loop
+        nudge = _protocol_incomplete(store, scn["events"], mark)
+        if nudge is None:
+            break
+        _run_turn(agent, nudge)
 
     actions = [e["action"] for e in store.ledger_tail(500)]
     bookings = [e for e in store.ledger_tail(500) if e["action"] == "appointment_booked"]

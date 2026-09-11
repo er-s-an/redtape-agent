@@ -33,15 +33,17 @@ uvicorn redtape.server:app --port 9200        # open http://localhost:9200
 
 Press **Run a check** in the UI. RedTape scans the document ledger, re-verifies the rules, computes the backward-chained plan, books a valid appointment, pre-fills the application (JSON + PDF draft), places calendar holds — and if a choice is irreversible or costs money, it stops and asks you in the **Decision Inbox**.
 
+![The dashboard: document chain, backward-chained timeline, and a decision that needs you](assets/dashboard.png)
+
 The demo environment (`mockgov/`) simulates the consulate/DMV portal so the whole loop runs offline and deterministically. The agent's reasoning, document parsing, form pre-fill, guardrails, and decision flow are real; the portal client is the only simulated piece, isolated behind one interface.
 
 ## What makes it an agent, not a reminder
 
 - **Dependency-graph planning** — deadlines are computed backwards from *when the document must be in hand*, through processing time and appointment lead, not forwards from an expiry date. Cross-renewal conflicts (passport surrendered while the license renewal needs it) are detected explicitly.
-- **Background by design** — a daemon wakes the agent on a schedule or on triggers; there is no chat to babysit.
-- **Deterministic guardrails** — Strands **hooks** cancel any booking that lands after the graph-computed safe date, and cancel any application submission not explicitly approved by you. Watch the hook fire in the Activity feed.
-- **A steering buddy** — Strands' `LLMSteeringHandler` reviews each tool call against natural-language operating rules and guides the agent back when it drifts.
-- **Auditable everything** — every action lands in a hash-chained ledger you can verify (`verify_ledger()`); sessions persist across restarts via `SnapshotSessionManager`.
+- **Background by design** — a daemon wakes the agent on a schedule or on triggers; there is no chat to babysit. After each wake the daemon verifies the cycle reached a terminal state (a booking landed, or a decision is pending/executed, or the plan required nothing) and nudges the agent once if it ended early — an empty model finish can't silently stall the chain.
+- **Deterministic guardrails** — Strands **hooks** cancel any booking that lands after the graph-computed safe date, and cancel any application submission not explicitly approved by you; an approved decision unlocks exactly the slots it names (even when the model buries the slot id in prose). Watch the hook fire in the Activity feed.
+- **A steering buddy** — Strands' `LLMSteeringHandler` reviews each tool call against natural-language operating rules and guides the agent back when it drifts. RedTape subclasses it to degrade "interrupt for human" decisions into guidance: a background agent must never suspend mid-turn waiting for a human — the Decision Inbox is the only human-input channel.
+- **Auditable everything** — every action lands in a hash-chained ledger you can verify (`verify_ledger()`); sessions persist across restarts via `SnapshotSessionManager`. The store runs in WAL mode with serialized access, so the web server, daemon, and CLI checks can share one database without starving each other's writes.
 - **Photo intake** — point a camera at a document; the vision model extracts the fields, you confirm, the agent takes it from there.
 
 ## Architecture
