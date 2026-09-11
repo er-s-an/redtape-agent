@@ -24,7 +24,6 @@ dev = [
 ]
 agentcore = [
     "bedrock-agentcore",
-    "strands-agents[bedrock]",
 ]
 
 [build-system]
