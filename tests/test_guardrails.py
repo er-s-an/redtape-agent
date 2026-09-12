@@ -15,13 +15,14 @@ Needs the sandbox portal on :9100 (the eval runner needs it too); skipped
 when it is not running.
 """
 import json
+import os
 from datetime import date
 from pathlib import Path
 
 import httpx
 import pytest
 
-MOCKGOV = "http://localhost:9100"
+MOCKGOV = os.environ.get("MOCKGOV_BASE", "http://localhost:9100")
 
 
 def _sandbox_up() -> bool:
@@ -68,6 +69,35 @@ def _blocked_why(store) -> list[str]:
             for e in store.ledger_tail(100) if e["action"] == "booking_blocked"]
 
 
+def _pipeline_draft(store, path: Path, *, content: str = "{}") -> tuple[Path, str]:
+    import hashlib
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content)
+    path = path.resolve()
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    store.log("agent", "form_prefilled", {
+        "jurisdiction": "cn-consulate-sf",
+        "doc_type": "passport",
+        "path": str(path),
+        "draft_sha256": digest,
+    })
+    return path, digest
+
+
+def _submission_approval(store, path: Path, digest: str, **overrides) -> int:
+    choice = {
+        "approve": True,
+        "doc_type": "passport",
+        "jurisdiction": "cn-consulate-sf",
+        "draft_path": str(path),
+        "draft_sha256": digest,
+    }
+    choice.update(overrides)
+    did = store.create_decision("submit_application", {"why": "test"}, [choice])
+    store.resolve_decision(did, choice)
+    return did
+
+
 def test_wrong_service_booking_is_cancelled(guard_ctx):
     guard, store = guard_ctx
     ev = FakeEvent("book_appointment",
@@ -108,19 +138,8 @@ def test_unapproved_submit_is_cancelled_and_logged(guard_ctx, tmp_path):
 
 def test_approval_is_a_one_time_nonce(guard_ctx, tmp_path):
     guard, store = guard_ctx
-    draft = tmp_path / "forms" / "draft.json"
-    draft.parent.mkdir(parents=True)
-    draft.write_text("{}")
-    import hashlib
-    draft_hash = hashlib.sha256(draft.read_bytes()).hexdigest()
-    # the draft must be pipeline-produced (this is what draft_form_prefill logs)
-    store.log("agent", "form_prefilled", {"jurisdiction": "cn-consulate-sf",
-                                          "doc_type": "passport",
-                                          "draft_sha256": draft_hash})
-    did = store.create_decision("submit_application", {"why": "attack"}, [])
-    store.resolve_decision(did, {"approve": True, "doc_type": "passport",
-                                 "jurisdiction": "cn-consulate-sf",
-                                 "draft_sha256": draft_hash})
+    draft, draft_hash = _pipeline_draft(store, tmp_path / "forms" / "draft.json")
+    did = _submission_approval(store, draft, draft_hash)
 
     first = FakeEvent("submit_application",
                       {"jurisdiction": "cn-consulate-sf", "doc_type": "passport",
@@ -139,12 +158,8 @@ def test_approval_is_a_one_time_nonce(guard_ctx, tmp_path):
 
 def test_approval_for_wrong_jurisdiction_is_cancelled(guard_ctx, tmp_path):
     guard, store = guard_ctx
-    draft = tmp_path / "forms" / "draft.json"
-    draft.parent.mkdir(parents=True)
-    draft.write_text("{}")
-    did = store.create_decision("submit_application", {"why": "attack"}, [])
-    store.resolve_decision(did, {"approve": True, "doc_type": "passport",
-                                 "jurisdiction": "wa-dol"})
+    draft, digest = _pipeline_draft(store, tmp_path / "forms" / "draft.json")
+    _submission_approval(store, draft, digest, jurisdiction="wa-dol")
     ev = FakeEvent("submit_application",
                    {"jurisdiction": "cn-consulate-sf", "doc_type": "passport",
                     "draft_path": str(draft)})
@@ -156,18 +171,8 @@ def test_approval_for_wrong_jurisdiction_is_cancelled(guard_ctx, tmp_path):
 
 def test_tampered_draft_is_cancelled(guard_ctx, tmp_path):
     guard, store = guard_ctx
-    draft = tmp_path / "forms" / "draft.json"
-    draft.parent.mkdir(parents=True)
-    draft.write_text("{}")
-    import hashlib
-    pipeline_hash = hashlib.sha256(draft.read_bytes()).hexdigest()
-    store.log("agent", "form_prefilled", {"jurisdiction": "cn-consulate-sf",
-                                          "doc_type": "passport",
-                                          "draft_sha256": pipeline_hash})
-    did = store.create_decision("submit_application", {"why": "attack"}, [])
-    store.resolve_decision(did, {"approve": True, "doc_type": "passport",
-                                 "jurisdiction": "cn-consulate-sf",
-                                 "draft_sha256": pipeline_hash})
+    draft, pipeline_hash = _pipeline_draft(store, tmp_path / "forms" / "draft.json")
+    _submission_approval(store, draft, pipeline_hash)
     # tamper AFTER the approval: the file no longer matches what was approved
     draft.write_text('{"applicant": {"name": "Mallory"}}')
     ev = FakeEvent("submit_application",
@@ -179,19 +184,115 @@ def test_tampered_draft_is_cancelled(guard_ctx, tmp_path):
 
 def test_foreign_draft_without_pipeline_origin_is_cancelled(guard_ctx, tmp_path):
     guard, store = guard_ctx
-    draft = tmp_path / "forms" / "foreign.json"
-    draft.parent.mkdir(parents=True)
+    # A historical pipeline draft has the same bytes/hash but a different path.
+    # Hash-only provenance must not bless this foreign path.
+    _pipeline_draft(store, tmp_path / "forms" / "pipeline.json")
+    draft = (tmp_path / "forms" / "foreign.json").resolve()
     draft.write_text("{}")
-    did = store.create_decision("submit_application", {"why": "attack"}, [])
-    store.resolve_decision(did, {"approve": True, "doc_type": "passport",
-                                 "jurisdiction": "cn-consulate-sf"})
+    import hashlib
+    digest = hashlib.sha256(draft.read_bytes()).hexdigest()
+    _submission_approval(store, draft, digest)
     ev = FakeEvent("submit_application",
                    {"jurisdiction": "cn-consulate-sf", "doc_type": "passport",
                     "draft_path": str(draft)})
     guard.before_tool(ev)  # type: ignore[arg-type] — structural test fake
     assert ev.cancel_tool, "a draft that never came from draft_form_prefill must be cancelled"
     blocked = [e for e in store.ledger_tail(100) if e["action"] == "submission_blocked"]
-    assert any("pipeline" in (e["detail"].get("why") or "") for e in blocked)
+    assert any("provenance" in (e["detail"].get("why") or "") for e in blocked)
+
+    # A path alias is not the exact dispatch path even if it resolves to the
+    # approved file. The guard must not normalize one request for comparison
+    # and then send a different string to the portal.
+    alias = draft.parent / ".." / "forms" / draft.name
+    alias_ev = FakeEvent("submit_application", {
+        "jurisdiction": "cn-consulate-sf", "doc_type": "passport", "draft_path": str(alias),
+    })
+    guard.before_tool(alias_ev)  # type: ignore[arg-type]
+    assert alias_ev.cancel_tool and "canonical" in str(alias_ev.cancel_tool)
+
+
+def test_approval_without_draft_sha256_cannot_authorize_historical_draft(guard_ctx, tmp_path):
+    guard, store = guard_ctx
+    draft, digest = _pipeline_draft(store, tmp_path / "forms" / "draft.json")
+    _submission_approval(store, draft, digest, draft_sha256=None)
+    ev = FakeEvent("submit_application", {
+        "jurisdiction": "cn-consulate-sf",
+        "doc_type": "passport",
+        "draft_path": str(draft),
+    })
+    guard.before_tool(ev)  # type: ignore[arg-type]
+    assert ev.cancel_tool, "a hashless approval must never authorize a historical pipeline draft"
+    blocked = [e for e in store.ledger_tail(100) if e["action"] == "submission_blocked"]
+    assert any("draft_sha256" in (e["detail"].get("why") or "") for e in blocked)
+
+    # A legacy/internal forged resolution cannot bypass the displayed options
+    # invariant at consumption time, even with otherwise exact provenance.
+    forged = {"approve": True, "doc_type": "passport", "jurisdiction": "cn-consulate-sf",
+              "draft_path": str(draft), "draft_sha256": digest}
+    rejection = {"approve": False, "doc_type": "passport", "jurisdiction": "cn-consulate-sf"}
+    did = store.create_decision("submit_application", {"why": "legacy"}, [rejection])
+    store.resolve_decision(did, forged)
+    forged_ev = FakeEvent("submit_application", {
+        "jurisdiction": "cn-consulate-sf", "doc_type": "passport", "draft_path": str(draft),
+    })
+    guard.before_tool(forged_ev)  # type: ignore[arg-type]
+    assert forged_ev.cancel_tool
+
+
+def test_consumed_approval_does_not_hide_newer_valid_approval(guard_ctx, tmp_path):
+    guard, store = guard_ctx
+    draft, digest = _pipeline_draft(store, tmp_path / "forms" / "draft.json")
+    first_id = _submission_approval(store, draft, digest)
+    first = FakeEvent("submit_application", {
+        "jurisdiction": "cn-consulate-sf", "doc_type": "passport", "draft_path": str(draft),
+    })
+    guard.before_tool(first)  # type: ignore[arg-type]
+    assert not first.cancel_tool
+
+    second_id = _submission_approval(store, draft, digest)
+    second = FakeEvent("submit_application", {
+        "jurisdiction": "cn-consulate-sf", "doc_type": "passport", "draft_path": str(draft),
+    })
+    guard.before_tool(second)  # type: ignore[arg-type]
+    assert not second.cancel_tool
+    allowed_ids = [e["detail"]["decision_id"] for e in store.ledger_tail(100)
+                   if e["action"] == "submission_allowed"]
+    assert allowed_ids == [first_id, second_id]
+
+
+def test_submission_approval_consumption_is_atomic_across_store_instances(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    from redtape.store import Store
+
+    db = tmp_path / "atomic.db"
+    owner = Store(db)
+    draft, digest = _pipeline_draft(owner, tmp_path / "forms" / "draft.json")
+    decision_id = _submission_approval(owner, draft, digest)
+    gate = Barrier(2)
+
+    contenders = [Store(db), Store(db)]
+
+    def claim(contender: Store) -> int | None:
+        try:
+            gate.wait()
+            claimed, _ = contender.consume_submission_approval(
+                doc_type="passport",
+                jurisdiction="cn-consulate-sf",
+                draft_path=str(draft),
+                draft_sha256=digest,
+            )
+            return claimed
+        finally:
+            contender.close()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        claims = list(pool.map(claim, contenders))
+    assert claims.count(decision_id) == 1 and claims.count(None) == 1
+    assert owner.conn.execute("SELECT COUNT(*) FROM submission_approval_uses").fetchone()[0] == 1
+    assert len([e for e in owner.ledger_tail(100) if e["action"] == "submission_allowed"]) == 1
+    assert owner.verify_ledger() is True
+    owner.close()
 
 
 def test_unconfirmed_document_cannot_be_booked(tmp_path, monkeypatch):

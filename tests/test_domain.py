@@ -70,3 +70,35 @@ def test_store_decision_flow_and_ledger_integrity(tmp_path):
     store.conn.execute("UPDATE ledger SET action = 'tampered' WHERE id = 1")
     assert store.verify_ledger() is False
     store.close()
+
+
+def test_submit_resolution_requires_displayed_exact_draft_binding():
+    from fastapi import HTTPException
+    from redtape.server import validate_resolution_choice
+
+    hashless = {"approve": True, "doc_type": "passport", "jurisdiction": "cn-consulate-sf"}
+    with pytest.raises(HTTPException, match="draft_path, draft_sha256"):
+        validate_resolution_choice(
+            {"kind": "submit_application", "options": [hashless]}, hashless
+        )
+
+    exact = {
+        "approve": True,
+        "doc_type": "passport",
+        "jurisdiction": "cn-consulate-sf",
+        "draft_path": "/tmp/passport-draft.json",
+        "draft_sha256": "a" * 64,
+    }
+    validate_resolution_choice(
+        {"kind": "submit_application", "options": [exact]}, exact
+    )
+    with pytest.raises(HTTPException, match="exactly match"):
+        validate_resolution_choice(
+            {"kind": "submit_application", "options": [exact]},
+            {**exact, "draft_sha256": "b" * 64},
+        )
+    with pytest.raises(HTTPException, match="exactly match"):
+        validate_resolution_choice(
+            {"kind": "submit_application", "options": [exact]},
+            {**exact, "approve": 1},
+        )

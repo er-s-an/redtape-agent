@@ -9,10 +9,10 @@ Two hard rules:
    approved decision. Autonomous bookings exist only for the travel-triggered
    passport renewal.
 2. submit_application is cancelled unless a human-approved decision covers
-   that exact jurisdiction + document, the draft is an unmodified pipeline
-   draft (and matches the approved draft hash when the approval names one),
-   and the approval has not been consumed before. Submission is human-only
-   by design.
+   that exact jurisdiction + document + pipeline draft path + mandatory hash.
+   The approval is atomically consumed before the submission attempt, so one
+   approval can authorize at most one dispatch. Submission is human-only by
+   design.
 
 Every tool call (and every cancellation) is written to the hash-chained ledger.
 """
@@ -175,90 +175,55 @@ class Guardrails(HookProvider):
 
     def _guard_submission(self, event: BeforeToolCallEvent, tool_input: dict) -> None:
         import hashlib
-        import json
         from pathlib import Path
         c = ctx()
         doc_type = tool_input.get("doc_type", "")
-        draft_path = tool_input.get("draft_path", "")
-        approved = c.store.conn.execute(
-            "SELECT id, resolution FROM decisions WHERE status IN ('resolved', 'executed') "
-            "AND kind = 'submit_application'"
-        ).fetchall()
-        for row in approved:
-            resolution = json.loads(row["resolution"])
-            choice = resolution.get("choice", {})
-            if not (choice.get("approve") is True and choice.get("doc_type") == doc_type):
-                continue
-            # jurisdiction binding: the approval covers exactly one filing
-            jurisdiction = tool_input.get("jurisdiction", "")
-            if choice.get("jurisdiction") != jurisdiction:
-                event.cancel_tool = (
-                    f"approval (decision {row['id']}) covers "
-                    f"{choice.get('jurisdiction')!r}, not {jurisdiction!r} — "
-                    "request a new decision for this filing"
-                )
-                c.store.log("hook", "submission_blocked",
-                            {"doc_type": doc_type, "jurisdiction": jurisdiction,
-                             "why": "jurisdiction mismatch", "decision_id": row["id"]})
-                return
-            # one-time nonce: an approval unlocks exactly one submission
-            consumed = c.store.conn.execute(
-                "SELECT 1 FROM ledger WHERE action = 'submission_allowed' "
-                "AND json_extract(detail, '$.decision_id') = ?",
-                (row["id"],),
-            ).fetchone()
-            if consumed:
-                event.cancel_tool = (
-                    f"approval (decision {row['id']}) was already consumed by an earlier "
-                    "submission — request a new decision to submit again"
-                )
-                c.store.log("hook", "submission_blocked",
-                            {"doc_type": doc_type, "why": "approval already consumed",
-                             "decision_id": row["id"]})
-                return
-            # draft binding: what we file must be an unmodified pipeline draft —
-            # and the exact draft the approval named, if it named one
-            draft_hash = ""
-            if draft_path:
-                try:
-                    draft_hash = hashlib.sha256(Path(draft_path).read_bytes()).hexdigest()
-                except OSError:
-                    event.cancel_tool = f"draft not found at {draft_path} — re-run draft_form_prefill"
-                    c.store.log("hook", "submission_blocked",
-                                {"doc_type": doc_type, "why": "draft missing"})
-                    return
-            approved_hash = choice.get("draft_sha256")
-            if approved_hash and approved_hash != draft_hash:
-                event.cancel_tool = (
-                    "the draft on disk no longer matches the draft the human approved "
-                    f"(decision {row['id']}) — re-run draft_form_prefill and re-approve"
-                )
-                c.store.log("hook", "submission_blocked",
-                            {"doc_type": doc_type, "why": "draft hash mismatch with approval",
-                             "decision_id": row["id"]})
-                return
-            produced = c.store.conn.execute(
-                "SELECT 1 FROM ledger WHERE action = 'form_prefilled' "
-                "AND json_extract(detail, '$.draft_sha256') = ?",
-                (draft_hash,),
-            ).fetchone()
-            if not produced:
-                event.cancel_tool = (
-                    "the draft at this path was not produced by draft_form_prefill "
-                    "(or was modified since) — only pipeline drafts can be filed"
-                )
-                c.store.log("hook", "submission_blocked",
-                            {"doc_type": doc_type, "why": "draft not pipeline-produced"})
-                return
-            c.store.log("hook", "submission_allowed",
-                        {"doc_type": doc_type, "jurisdiction": jurisdiction,
-                         "decision_id": row["id"], "draft_sha256": draft_hash})
+        jurisdiction = tool_input.get("jurisdiction", "")
+        raw_path = tool_input.get("draft_path", "")
+        try:
+            path = Path(raw_path).resolve(strict=True)
+            draft_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+        except (OSError, TypeError):
+            event.cancel_tool = f"draft not found at {raw_path!r} — re-run draft_form_prefill"
+            c.store.log(
+                "hook", "submission_blocked",
+                {"doc_type": doc_type, "jurisdiction": jurisdiction, "why": "draft missing"},
+            )
+            return
+
+        # The path string sent downstream must be the exact canonical path that
+        # the pipeline produced and the human approved. An alias (relative path,
+        # ``..`` segment, or symlink) is a different dispatch request even when
+        # it happened to resolve to the same bytes during this check.
+        if raw_path != str(path):
+            reason = "draft_path is not the canonical pipeline path"
+            event.cancel_tool = (
+                "submission is human-only: draft_path must exactly match the "
+                "canonical path returned by draft_form_prefill"
+            )
+            c.store.log(
+                "hook", "submission_blocked",
+                {"doc_type": doc_type, "jurisdiction": jurisdiction, "why": reason},
+            )
+            return
+
+        decision_id, reason = c.store.consume_submission_approval(
+            doc_type=doc_type,
+            jurisdiction=jurisdiction,
+            draft_path=str(path),
+            draft_sha256=draft_hash,
+        )
+        if decision_id is not None:
             return
         event.cancel_tool = (
-            "submission is human-only: no approved decision covers "
-            f"{doc_type}. Use request_human_decision first."
+            "submission is human-only: no unused approval exactly covers this "
+            f"jurisdiction, document, draft path and draft_sha256 ({reason}). "
+            "Request a new decision for this exact draft."
         )
-        c.store.log("hook", "submission_blocked", {"doc_type": doc_type})
+        c.store.log(
+            "hook", "submission_blocked",
+            {"doc_type": doc_type, "jurisdiction": jurisdiction, "why": reason},
+        )
 
 
 def _load_events(c) -> list[dict]:

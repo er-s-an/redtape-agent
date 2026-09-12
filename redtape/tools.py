@@ -180,10 +180,17 @@ def book_appointment(slot_id: str, office: str, service: str, doc_type: str,
             return {"error": "slot already taken", "slot_id": slot_id}
         resp.raise_for_status()
         booking = resp.json()
-    c.store.log("agent", "appointment_booked", {"slot_id": slot_id, "reason": reason,
-                                                "office": office, "service": service,
-                                                "doc_type": doc_type,
-                                                "confirmation": booking["confirmation_code"]})
+    c.store.log("agent", "appointment_booked", {
+        "slot_id": slot_id,
+        "booking_id": booking["booking_id"],
+        "confirmation": booking["confirmation_code"],
+        "date": booking["date"],
+        "time": booking["time"],
+        "reason": reason,
+        "office": office,
+        "service": service,
+        "doc_type": doc_type,
+    })
     return booking
 
 
@@ -267,7 +274,13 @@ def request_human_decision(kind: str, context: str, options: list[dict]) -> dict
     Options carry concrete dates/margins so the human can decide in one look.
     Every option that involves a booking MUST include a top-level "slot_id"
     field (e.g. {"label": ..., "slot_id": "S-1003"}) — the guardrail unlocks
-    that exact slot on approval."""
+    that exact slot on approval. Processing choices also carry top-level
+    ``processing_tier``, ``fee_usd``, ``expected_in_hand`` and
+    ``trip_margin_days`` fields so the post-choice receipt is unambiguous.
+    A submit_application approve option MUST copy
+    the exact top-level ``doc_type``, ``jurisdiction``, ``draft_path`` and
+    ``draft_sha256`` returned by draft_form_prefill, plus ``approve: true``;
+    rejection options must say ``approve: false``."""
     c = ctx()
     decision_id = c.store.create_decision(
         kind,

@@ -11,7 +11,7 @@
   <!-- triggers -->
   <rect x="40" y="100" width="180" height="110" rx="12" fill="#fffdf9" stroke="#1c1917"/>
   <text x="130" y="126" text-anchor="middle" font-size="13" font-weight="700" fill="#1c1917">triggers</text>
-  <text x="130" y="150" text-anchor="middle" font-size="11" fill="#44403c">scheduler (cron)</text>
+  <text x="130" y="150" text-anchor="middle" font-size="11" fill="#44403c">scheduler / trigger</text>
   <text x="130" y="170" text-anchor="middle" font-size="11" fill="#44403c">document upload (photo)</text>
   <text x="130" y="190" text-anchor="middle" font-size="11" fill="#44403c">travel / renewal events</text>
 
@@ -21,7 +21,7 @@
 
   <rect x="316" y="140" width="268" height="56" rx="8" fill="#f6e4df"/>
   <text x="450" y="162" text-anchor="middle" font-size="12" font-weight="700" fill="#b3331d">guardrail hooks — before every tool call</text>
-  <text x="450" y="180" text-anchor="middle" font-size="10.5" fill="#44403c">cancel bookings past the safe date · submissions need your approval</text>
+  <text x="450" y="180" text-anchor="middle" font-size="10.5" fill="#44403c">bound slots · exact draft approval before filing</text>
 
   <rect x="316" y="206" width="268" height="52" rx="8" fill="#faeed7"/>
   <text x="450" y="226" text-anchor="middle" font-size="12" font-weight="700" fill="#a05f08">steering buddy (LLMSteeringHandler)</text>
@@ -29,7 +29,7 @@
 
   <rect x="316" y="268" width="268" height="52" rx="8" fill="#e2f0e7"/>
   <text x="450" y="288" text-anchor="middle" font-size="12" font-weight="700" fill="#2f7d4f">session snapshots (SnapshotSessionManager)</text>
-  <text x="450" y="306" text-anchor="middle" font-size="10.5" fill="#44403c">restarts never lose state</text>
+  <text x="450" y="306" text-anchor="middle" font-size="10.5" fill="#44403c">persists and reloads conversation state</text>
 
   <!-- tools -->
   <rect x="300" y="392" width="300" height="128" rx="12" fill="#fffdf9" stroke="#1c1917"/>
@@ -44,13 +44,13 @@
   <text x="770" y="126" text-anchor="middle" font-size="13" font-weight="700" fill="#1c1917">government portal</text>
   <text x="770" y="150" text-anchor="middle" font-size="11" fill="#44403c">mockgov sandbox in demo</text>
   <text x="770" y="170" text-anchor="middle" font-size="11" fill="#44403c">slots · versioned rules · intake</text>
-  <text x="770" y="190" text-anchor="middle" font-size="10.5" fill="#78716c">swappable client, same interface</text>
+  <text x="770" y="190" text-anchor="middle" font-size="10.5" fill="#78716c">live connector not demonstrated</text>
 
   <!-- store -->
   <rect x="680" y="252" width="180" height="108" rx="12" fill="#fffdf9" stroke="#1c1917"/>
   <text x="770" y="278" text-anchor="middle" font-size="13" font-weight="700" fill="#1c1917">local store (SQLite)</text>
   <text x="770" y="302" text-anchor="middle" font-size="11" fill="#44403c">verified documents</text>
-  <text x="770" y="322" text-anchor="middle" font-size="11" fill="#44403c">dependency graph</text>
+  <text x="770" y="322" text-anchor="middle" font-size="11" fill="#44403c">decisions + approval state</text>
   <text x="770" y="342" text-anchor="middle" font-size="11" fill="#44403c">append-only hash-chained ledger</text>
 
   <!-- human -->

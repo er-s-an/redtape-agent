@@ -8,6 +8,8 @@ scan-and-act cycle live.
 from __future__ import annotations
 
 import json
+import os
+import re
 import subprocess
 import sys
 import threading
@@ -20,10 +22,10 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .paths import DATA_DIR, REPO_ROOT
-from .store import Store
+from .store import Store, same_json_value
 from .clock import today as clock_today
 
-MOCKGOV_BASE = "http://localhost:9100"
+MOCKGOV_BASE = os.environ.get("MOCKGOV_BASE", "http://localhost:9100").rstrip("/")
 STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI(title="RedTape")
@@ -50,14 +52,16 @@ def state() -> dict:
         docs.append({**d, "days_until_expiry": (expiry - today).days})
     events_path = DATA_DIR / "events.json"
     events = json.loads(events_path.read_text()) if events_path.exists() else []
+    activity = s.ledger_tail(80)
     return {
         "today": today.isoformat(),
         "documents": docs,
         "decisions": s.pending_decisions(),
-        "activity": s.ledger_tail(80),
+        "activity": activity,
         "events": events,
         "timeline": compute_timeline(s, today, events),
         "wake": {k: v for k, v in _wake_state.items()},
+        "ledger_verified": s.verify_ledger(),
     }
 
 
@@ -116,12 +120,41 @@ def graph() -> dict:
 # --- decisions -----------------------------------------------------------
 
 class ResolveRequest(BaseModel):
-    choice: dict
+    choice: dict[str, object]
+
+
+def validate_resolution_choice(decision: dict, choice: dict[str, object]) -> None:
+    """Accept only a displayed option; submission approvals need exact binding."""
+    if not any(same_json_value(choice, option) for option in decision.get("options", [])):
+        raise HTTPException(422, "choice must exactly match one option shown in this decision")
+    if decision.get("kind") != "submit_application":
+        return
+    approve = choice.get("approve")
+    if type(approve) is not bool:
+        raise HTTPException(422, "submission choices must explicitly set approve true or false")
+    if approve is False:
+        return
+    required = ("doc_type", "jurisdiction", "draft_path", "draft_sha256")
+    missing = [name for name in required if not isinstance(choice.get(name), str) or not choice.get(name)]
+    if missing:
+        raise HTTPException(422, f"submission approval is missing exact binding: {', '.join(missing)}")
+    if re.fullmatch(r"[0-9a-f]{64}", str(choice["draft_sha256"])) is None:
+        raise HTTPException(422, "submission approval draft_sha256 must be 64 lowercase hex characters")
 
 
 @app.post("/api/decisions/{decision_id}/resolve")
 def resolve(decision_id: int, req: ResolveRequest) -> dict:
-    store().resolve_decision(decision_id, req.choice, by="human")
+    s = store()
+    decision = s.get_decision(decision_id)
+    if decision is None:
+        raise HTTPException(404, "decision not found")
+    if decision["status"] != "pending":
+        raise HTTPException(409, "decision is no longer pending")
+    validate_resolution_choice(decision, req.choice)
+    try:
+        s.resolve_decision(decision_id, req.choice, by="human")
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
 
     def _wake_when_free() -> None:
         import time
@@ -130,7 +163,7 @@ def resolve(decision_id: int, req: ResolveRequest) -> dict:
         wake()
 
     threading.Thread(target=_wake_when_free, daemon=True).start()
-    return {"ok": True}
+    return {"ok": True, "decision_id": decision_id, "status": "resolved"}
 
 
 # --- documents ------------------------------------------------------------

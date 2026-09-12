@@ -1,69 +1,51 @@
-# RedTape demo video — narration script + story skeleton
+# RedTape — current 128-second English submission film
 
-VIDEO_STATUS = DEFERRED-BY-DESIGN. Engineering is still moving; this script is the
-frozen story skeleton for the final recording. Do not re-record until the
-engineering freeze gate passes (core loop stable, P0 + attack matrix green,
-evidence bound to the release SHA, README/submission aligned). When recording,
-bind every on-screen number to the SHA in `evals/reports/last-run.json`.
+Recorded Strands run · Government sandbox. Synthetic Xiao. Waiting condensed; same-case persisted-session continuation.
 
-Segments drive the assembly: cards are HTML→PNG loops, demo footage is a real
-recorded run (sped up where noted). Voice: macOS `say`, re-recordable by the human later.
+## 0–10s — A family trip. A passport to renew.
 
-Story: one person, one cascade, one decision.
+Xiao has a family trip on November twentieth. Before she can go, she needs to renew her passport.
 
-## S1 · title (card, ~7s)
-"RedTape — an agent for the paperwork of a life across borders."
+## 10–20s — Valid today. Too short for the trip.
 
-## S2 · problem — one person (card, ~30s)
-"Xiao has to fly home on November 20th. Her passport shows seven months left —
-plenty, you'd think. But the visa rule needs six months of validity beyond the
-trip, the consulate keeps your passport for four to eight weeks, and the license
-renewal needs the passport in hand. One date is coming from four directions, and
-no reminder app sees the chain. RedTape does."
+Her passport looks valid. But these sandbox rules require six months remaining beyond the travel date. For November, it falls short.
 
-## S3 · demo wake (footage, ~50s at 8x)
-"RedTape runs in the background — no app to babysit. We're triggering one of its
-scheduled checks. It scans the document ledger and re-reads the versioned rules
-from the government sandbox that ships with the repo — and catches what a human
-would miss: the November 20th trip requires six months of passport validity, and
-this passport expires in April."
+## 20–31s — The agent starts the work.
 
-## S4 · plan (card, ~16s)
-"It computes deadlines backwards: in hand by November 13th, minus eight weeks of
-processing — regular handling means submitting by mid-September. The earliest
-consulate slot is October 3rd. Regular processing cannot make it."
+RedTape gets to work. Its Strands agent checks her documents, refreshes the sandbox rules, builds a renewal plan, and searches for appointments.
 
-## S5 · autonomous work (footage, ~30s at 6x)
-"It still does the safe work: the renewal plan computed, the application
-pre-filled as a draft, calendar holds placed. It books nothing — no slot can make
-the regular deadline, and its guardrails will not let it gamble on a late one."
+## 31–43s — Start at the trip. Work backward.
 
-## S6 · decision (card, ~10s)
-"When no regular path is safe, it doesn't gamble — it stops, and asks. Once."
+The plan works backward. November thirteenth: passport in hand. September eighteenth: latest regular filing. Processing time turns a distant trip into an urgent task.
 
-## S7 · decision inbox (footage, ~28s, real-time)
-"One viable path: expedited processing, the October 3rd slot, eighty-three
-dollars — in hand around October 31st, twenty days before the trip. You approve
-it. The guardrail verifies the approval — and RedTape books exactly that slot."
+## 43–53s — The earliest appointment is too late.
 
-## S8 · trust (card + numbers, ~22s)
-"Underneath: Strands agent hooks cancel unsafe actions before they run — a
-wrong-service booking, an unapproved submission, a reused approval — a steering
-buddy reviews every tool call, sessions survive restarts, and every action lands
-in a hash-chained ledger. The scripted scenarios and the direct attack matrix
-run green against the release SHA; the report is in the repo."
+Then the appointment search returns October third. That is already after the regular filing deadline. The first available appointment cannot make the regular plan.
 
-## S9 · close (card, ~10s)
-"RedTape. Built with the Strands Agents SDK. For the 304 million people whose
-lives span borders — one quiet chain of paperwork, watched end to end, in the
-sandbox that ships with this repository."
+## 53–65s — Useful preparation. Nothing submitted.
 
-## Truth labels for the editor
+RedTape still prepares what it can: a watermarked application draft and local calendar holds. Xiao can inspect the work. Nothing has been filed.
 
-| Segment | Label | Note |
-|---|---|---|
-| S3/S5/S7 footage | Real (sandbox) | recorded against the repo's mockgov sandbox, not a live agency |
-| S4 plan math | Real | deterministic domain layer, same code the agent runs |
-| S7 approval → booking | Real | guardrail unlock path, recorded live |
-| "government sandbox" mention | Required disclosure | never narrate as a live consulate/DMV integration |
-| S8 numbers | Bind to SHA | on-screen: scenario count, pass count, commit short SHA from last-run.json |
+## 65–75s — A late booking needs her decision.
+
+The late booking also meets a hard stop. Deterministic checks enforce the date boundary. The model cannot grant itself permission to bypass it.
+
+## 75–88s — One clear choice.
+
+So RedTape brings Xiao one concrete choice: eighty-three dollars for expedited processing, a projected October thirty-first return, and twenty days before her flight.
+
+## 88–98s — Xiao decides.
+
+Price and timing stay together. For this demonstration, Xiao's exact expedited option is approved. The agent can now act on that appointment.
+
+## 98–109s — The approved action becomes a receipt.
+
+Now the same booking passes the approval check. RedTape books the October third sandbox slot and returns its confirmation. The approved choice and result stay connected.
+
+## 109–119s — A confirmation. A next step.
+
+This sandbox receipt shows the appointment, projected return, and next step, with a locally verifiable record. No government application has been filed.
+
+## 119–128s — Life moves forward. RedTape works backward.
+
+The paperwork keeps moving. The decision stays hers. Life moves forward. RedTape works backward.

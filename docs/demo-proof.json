@@ -1,0 +1,144 @@
+{
+  "recordedAt": "2026-09-12",
+  "status": "PASS",
+  "provider": "Kimi OpenAI-compatible endpoint",
+  "requestedModel": "kimi-for-coding",
+  "returnedModels": [
+    "kimi-for-coding"
+  ],
+  "strandsAgentsVersion": "1.55.1",
+  "clock": "2026-09-11",
+  "persona": "Xiao Demo \u2014 synthetic seeded records only",
+  "scenario": {
+    "travel": "2026-11-20",
+    "passportExpiry": "2027-04-15",
+    "requiredValidity": "2027-05-20",
+    "passportInHandBy": "2026-11-13",
+    "latestRegularFiling": "2026-09-18",
+    "bookBy": "2026-09-11"
+  },
+  "checks": {
+    "genuine_hosted_model_response": true,
+    "model_selected_tools": true,
+    "genuine_preapproval_guard_block": true,
+    "same_decision_executed": true,
+    "one_matching_booking": true,
+    "guard_required_approval": true,
+    "no_application_filed": true,
+    "ledger_verified": true,
+    "resumed_agent_ended_normally": true
+  },
+  "approvedOption": {
+    "slot_id": "S-1003",
+    "processing_tier": "expedited",
+    "fee_usd": 83,
+    "expected_in_hand": "2026-10-31",
+    "trip_margin_days": 20
+  },
+  "booking": {
+    "slot_id": "S-1003",
+    "booking_id": "B1000",
+    "confirmation": "CNF-B1000",
+    "date": "2026-10-03",
+    "time": "09:30",
+    "office": "cn-consulate-sf",
+    "service": "passport_renewal",
+    "doc_type": "passport"
+  },
+  "actualLedger": {
+    "blockedBeforeApproval": 30,
+    "decisionRequested": 48,
+    "exactOptionApproved": 53,
+    "guardAllowed": 58,
+    "appointmentBooked": 59,
+    "decisionExecuted": 62,
+    "hashChainVerified": true
+  },
+  "runtime": {
+    "hostedRequests": 45,
+    "completedRequests": 43,
+    "connectionFailures": 2,
+    "modelSelectedToolCalls": 20,
+    "firstWake": "Decision produced; caller timer interrupted, worker cleanup completed; original incomplete status retained privately.",
+    "followThrough": "Same persisted Strands session and same Store; focused natural-language continuation; eight further hosted requests; end_turn.",
+    "syntheticApproval": "Demo operator selected the actual displayed option through the original validation function. No actual user browser click is claimed.",
+    "filmTiming": "Recorded workflow with waiting condensed; no real-time claim."
+  },
+  "scope": [
+    "No live government connector, application filing, payment or real booking",
+    "No paid photo intake exercised in this demonstration",
+    "One current scenario; historical nine-scenario report is not release-wide certification",
+    "Primary agent, tools, guard, planner and steering source unchanged from the observed run; release UI now displays actual generated alternatives and matching receipt fields"
+  ],
+  "observedSourceHead": "ff5d385799ae8f80a663a3fd81e7c2712dedcb9d",
+  "observedRuntimeFileHashes": [
+    {
+      "path": "redtape/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "redtape/agent.py",
+      "sha256": "6819b3a743bd7e7eef3ed2d6ab070930086b68781c99a91275f96d94b91d4d40"
+    },
+    {
+      "path": "redtape/agentcore_app.py",
+      "sha256": "9714d500574dfb23f5fe5a040cb89d6080be66d5d29bd1f558a4d6999750a15f"
+    },
+    {
+      "path": "redtape/clock.py",
+      "sha256": "8e726728901421c844561193729c87376b20799bc5afe5c68042f40ebc1f93ca"
+    },
+    {
+      "path": "redtape/daemon.py",
+      "sha256": "3c2b54018f2376ded71f3a3cb69c037c8f9ab606857c0701eec576519274dd5a"
+    },
+    {
+      "path": "redtape/domain.py",
+      "sha256": "e765721aa6e9cc434d23d33b72774d5e706148c4e80988648925dd1d4fcf8fbf"
+    },
+    {
+      "path": "redtape/model.py",
+      "sha256": "5b60fbdea06864e64c86518b1c2d65f102159092742cded6f58e7d6610d96f77"
+    },
+    {
+      "path": "redtape/paths.py",
+      "sha256": "f932391c0f12ae708ec1b2200558a82a4bf53bf9af661852d517b8518247aa47"
+    },
+    {
+      "path": "redtape/pdf.py",
+      "sha256": "1eb7fe16057b9dc3ab8547e04599f43326c47fca637b8c33de04ddfe9deeec30"
+    },
+    {
+      "path": "redtape/plugins/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "redtape/plugins/guardrails.py",
+      "sha256": "d66cfab7ea03a29cc0936dad22d563eeb41217048906ebb34b34fcb8e6f97b24"
+    },
+    {
+      "path": "redtape/server.py",
+      "sha256": "24a8710ede4ee5724e8b427ac4c708fd5ced63b5e6b0b8942508091a4891a303"
+    },
+    {
+      "path": "redtape/store.py",
+      "sha256": "c4b130d6ad2a0ce70001fff179576c68124b3ac7fafde4657b9cd294e692c5f1"
+    },
+    {
+      "path": "redtape/tools.py",
+      "sha256": "bad2759836d7792df5d031ff9e5abe3436526f79aec687544204ead4f1bc6f22"
+    },
+    {
+      "path": "redtape/vision.py",
+      "sha256": "ffc51f0b98dfd8dfae0f25e4bed097e5cc656f9ddb10eb5587137e023e30f860"
+    },
+    {
+      "path": "mockgov/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "mockgov/app.py",
+      "sha256": "5e237e1400fb724fe8969b2d91824625794863c68b9800ab2fc4ccec75d5ad93"
+    }
+  ]
+}

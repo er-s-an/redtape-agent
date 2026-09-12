@@ -49,6 +49,14 @@ CREATE TABLE IF NOT EXISTS ledger (
     prev_hash TEXT NOT NULL,
     hash TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS submission_approval_uses (
+    decision_id INTEGER PRIMARY KEY,
+    consumed_at TEXT NOT NULL,
+    doc_type TEXT NOT NULL,
+    jurisdiction TEXT NOT NULL,
+    draft_path TEXT NOT NULL,
+    draft_sha256 TEXT NOT NULL
+);
 """
 
 GENESIS = "0" * 64
@@ -56,6 +64,17 @@ GENESIS = "0" * 64
 
 def _utcnow() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def same_json_value(left: Any, right: Any) -> bool:
+    """Compare JSON values without Python's bool/int equality coercion."""
+    try:
+        canonical = lambda value: json.dumps(
+            value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+        )
+        return canonical(left) == canonical(right)
+    except (TypeError, ValueError):
+        return False
 
 
 class Store:
@@ -100,7 +119,9 @@ class Store:
     def get_document_by_type(self, doc_type: str) -> dict[str, Any] | None:
         with self._lock:
             row = self.conn.execute(
-                "SELECT * FROM documents WHERE doc_type = ? ORDER BY expiry_date DESC LIMIT 1", (doc_type,)
+                "SELECT * FROM documents WHERE doc_type = ? "
+                "ORDER BY confirmed DESC, expiry_date DESC, id DESC LIMIT 1",
+                (doc_type,),
             ).fetchone()
             return self._row(row, json_cols=("fields",)) if row else None
 
@@ -148,12 +169,25 @@ class Store:
             ).fetchall()
             return [self._row(r, json_cols=("context", "options")) for r in rows]
 
+    def get_decision(self, decision_id: int) -> dict[str, Any] | None:
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT * FROM decisions WHERE id = ?", (decision_id,)
+            ).fetchone()
+            return self._row(
+                row, json_cols=("context", "options", "resolution")
+            ) if row else None
+
     def resolve_decision(self, decision_id: int, choice: Any, by: str = "human") -> None:
         with self._lock:
-            self.conn.execute(
-                "UPDATE decisions SET status = 'resolved', resolved_at = ?, resolution = ? WHERE id = ?",
+            cur = self.conn.execute(
+                "UPDATE decisions SET status = 'resolved', resolved_at = ?, resolution = ? "
+                "WHERE id = ? AND status = 'pending'",
                 (_utcnow(), json.dumps({"choice": choice, "by": by}), decision_id),
             )
+            if cur.rowcount != 1:
+                self.conn.rollback()
+                raise ValueError(f"decision {decision_id} is missing or no longer pending")
             self.conn.commit()
             self.log(by, "decision_resolved", {"decision_id": decision_id, "choice": choice})
 
@@ -170,22 +204,141 @@ class Store:
             self.conn.commit()
             self.log("agent", "decision_executed", {"decision_id": decision_id})
 
+    def consume_submission_approval(
+        self,
+        *,
+        doc_type: str,
+        jurisdiction: str,
+        draft_path: str,
+        draft_sha256: str,
+    ) -> tuple[int | None, str]:
+        """Atomically claim one exact, human-issued submission approval.
+
+        The claim and its hash-chained ``submission_allowed`` evidence share one
+        SQLite write transaction. A unique decision id makes concurrent claims
+        across threads or Store instances resolve to one winner. Invalid or
+        already-used candidates are skipped so a newer valid approval can still
+        authorize the filing.
+        """
+        with self._lock:
+            self.conn.execute("BEGIN IMMEDIATE")
+            try:
+                rows = self.conn.execute(
+                    "SELECT id, options, resolution FROM decisions "
+                    "WHERE status IN ('resolved', 'executed') "
+                    "AND kind = 'submit_application' "
+                    "ORDER BY COALESCE(resolved_at, created_at) DESC, id DESC"
+                ).fetchall()
+                reason = "no unused human approval exactly matches this filing"
+                for row in rows:
+                    try:
+                        resolution = json.loads(row["resolution"] or "{}")
+                    except (TypeError, json.JSONDecodeError):
+                        continue
+                    choice = resolution.get("choice", {})
+                    if not isinstance(choice, dict):
+                        continue
+                    try:
+                        options = json.loads(row["options"] or "[]")
+                    except (TypeError, json.JSONDecodeError):
+                        options = []
+                    if not isinstance(options, list) or not any(
+                        same_json_value(choice, option) for option in options
+                    ):
+                        reason = f"decision {row['id']} resolution was not one of its displayed options"
+                        continue
+                    if choice.get("approve") is not True or choice.get("doc_type") != doc_type:
+                        continue
+                    decision_id = int(row["id"])
+                    if resolution.get("by") != "human":
+                        reason = f"decision {decision_id} was not resolved by a human"
+                        continue
+                    if choice.get("jurisdiction") != jurisdiction:
+                        reason = f"decision {decision_id} covers another jurisdiction"
+                        continue
+                    approved_hash = choice.get("draft_sha256")
+                    if not isinstance(approved_hash, str) or not approved_hash:
+                        reason = f"decision {decision_id} has no approved draft_sha256"
+                        continue
+                    if approved_hash != draft_sha256:
+                        reason = f"decision {decision_id} covers another draft hash"
+                        continue
+                    approved_path = choice.get("draft_path")
+                    if approved_path != draft_path:
+                        reason = f"decision {decision_id} covers another draft path"
+                        continue
+                    produced = self.conn.execute(
+                        "SELECT 1 FROM ledger WHERE action = 'form_prefilled' "
+                        "AND json_extract(detail, '$.doc_type') = ? "
+                        "AND json_extract(detail, '$.jurisdiction') = ? "
+                        "AND json_extract(detail, '$.path') = ? "
+                        "AND json_extract(detail, '$.draft_sha256') = ? LIMIT 1",
+                        (doc_type, jurisdiction, draft_path, draft_sha256),
+                    ).fetchone()
+                    if not produced:
+                        reason = "the exact draft path and hash have no matching pipeline provenance"
+                        continue
+                    historical = self.conn.execute(
+                        "SELECT 1 FROM ledger WHERE action = 'submission_allowed' "
+                        "AND json_extract(detail, '$.decision_id') = ? LIMIT 1",
+                        (decision_id,),
+                    ).fetchone()
+                    if historical:
+                        reason = f"decision {decision_id} was already consumed"
+                        continue
+                    cur = self.conn.execute(
+                        "INSERT INTO submission_approval_uses "
+                        "(decision_id, consumed_at, doc_type, jurisdiction, draft_path, draft_sha256) "
+                        "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(decision_id) DO NOTHING",
+                        (decision_id, _utcnow(), doc_type, jurisdiction, draft_path, draft_sha256),
+                    )
+                    if cur.rowcount != 1:
+                        reason = f"decision {decision_id} was already consumed"
+                        continue
+                    self._append_ledger_locked(
+                        "hook",
+                        "submission_allowed",
+                        {
+                            "doc_type": doc_type,
+                            "jurisdiction": jurisdiction,
+                            "decision_id": decision_id,
+                            "draft_path": draft_path,
+                            "draft_sha256": draft_sha256,
+                        },
+                    )
+                    self.conn.commit()
+                    return decision_id, ""
+                self.conn.commit()
+                return None, reason
+            except Exception:
+                self.conn.rollback()
+                raise
+
     # --- ledger ----------------------------------------------------------
 
     def log(self, actor: str, action: str, detail: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
-            prev = self.conn.execute("SELECT hash FROM ledger ORDER BY id DESC LIMIT 1").fetchone()
-            prev_hash = prev["hash"] if prev else GENESIS
-            ts = _utcnow()
-            body = json.dumps({"ts": ts, "actor": actor, "action": action, "detail": detail},
-                              sort_keys=True, ensure_ascii=False)
-            digest = hashlib.sha256((prev_hash + body).encode()).hexdigest()
-            self.conn.execute(
-                "INSERT INTO ledger (ts, actor, action, detail, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?)",
-                (ts, actor, action, json.dumps(detail, ensure_ascii=False), prev_hash, digest),
-            )
+            entry = self._append_ledger_locked(actor, action, detail)
             self.conn.commit()
-            return {"ts": ts, "actor": actor, "action": action, "hash": digest}
+            return entry
+
+    def _append_ledger_locked(
+        self, actor: str, action: str, detail: dict[str, Any]
+    ) -> dict[str, Any]:
+        prev = self.conn.execute("SELECT hash FROM ledger ORDER BY id DESC LIMIT 1").fetchone()
+        prev_hash = prev["hash"] if prev else GENESIS
+        ts = _utcnow()
+        body = json.dumps(
+            {"ts": ts, "actor": actor, "action": action, "detail": detail},
+            sort_keys=True,
+            ensure_ascii=False,
+        )
+        digest = hashlib.sha256((prev_hash + body).encode()).hexdigest()
+        self.conn.execute(
+            "INSERT INTO ledger (ts, actor, action, detail, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?)",
+            (ts, actor, action, json.dumps(detail, ensure_ascii=False), prev_hash, digest),
+        )
+        return {"ts": ts, "actor": actor, "action": action, "hash": digest}
 
     def ledger_tail(self, n: int = 50) -> list[dict[str, Any]]:
         with self._lock:

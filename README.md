@@ -1,105 +1,96 @@
 # RedTape
 
-**An autonomous agent that guards the dependency chain of your cross-border documents — passport, visa, permit, license — and handles renewals end to end in the background, surfacing only when a real decision needs you.**
+**Life moves forward. RedTape works backward.**
 
-Built with the [Strands Agents SDK](https://strandsagents.com/) · Agents for Humans Hackathon, **Everyday Agents** track.
+A background agent for cross-border paperwork. Built with the [Strands Agents SDK](https://strandsagents.com/), RedTape turns a distant travel date into an executable renewal plan, prepares reversible work, and asks before the choice becomes costly or irreversible.
 
-## The problem
+## One trip, one hidden deadline
 
-**November 20, a flight home.** The passport looks fine — seven months left. But the trip needs six months of validity *beyond* the stay, the consulate takes up to eight weeks to process, and appointments book out weeks ahead. Run the chain backwards and "seven months left" is an emergency with a six-week fuse.
+Xiao's family trip is on November 20. Her passport expires the following April: it looks valid, but the demo's six-month rule requires validity through May 20. Working backward gives a November 13 in-hand target, September 18 latest regular filing, and September 11 book-by date. The first available appointment is October 3.
 
-For people who live across borders, life admin is not a reminder list — it is a dependency graph. A driver's-license renewal needs a valid passport and lawful status. A visa stamp needs six months of passport validity. And the renewal itself takes 4–8 weeks during which **you don't have your passport**. Miss one window and the chain cascades: lost status, fines, or no way to fly home for an emergency.
+The Strands agent checks confirmed documents, reads versioned sandbox rules, computes the plan and searches appointment availability. A deterministic hook blocks the late booking. RedTape prepares a draft and calendar holds, then puts the real tradeoff in the Decision Inbox:
 
-Reminder apps tell you a date is coming. RedTape computes your deadlines *backwards* from the constraints, does the safe work itself — checks the rules, books the appointment, pre-fills the forms, holds the calendar — and only interrupts you when a decision is genuinely yours.
+> S-1003 · $83 expedited · projected return October 31 · 20 days before the flight.
 
-## See it run
+After that exact option is approved, the agent books the sandbox appointment and returns a matching confirmation. Xiao retains the decision; RedTape carries out the approved work.
 
-```bash
-git clone https://github.com/er-s-an/redtape-agent.git && cd redtape-agent
-uv venv && uv pip install -e ".[dev]"        # or: python -m venv .venv && pip install -e ".[dev]"
-export KIMI_CODE_API_KEY=...                  # any Strands-supported model key; see Configuration
+![Architecture](docs/architecture.png)
 
-bash scripts/demo.sh                          # one command: sandbox + web app + demo persona, opens the UI
-```
+## Run locally
 
-Or step by step:
+Tested with Python 3.13 and Strands Agents 1.55.1. A Kimi API credential is required for the default model loop; deterministic tests do not call a model.
 
 ```bash
-# terminal 1 — the sandboxed government portal (deterministic demo environment)
-uvicorn mockgov.app:app --port 9100
-
-# terminal 2 — the product
-python scripts/seed_persona.py                # synthetic demo persona, no real data
-uvicorn redtape.server:app --port 9200        # open http://localhost:9200
+git clone https://github.com/er-s-an/redtape-agent.git
+cd redtape-agent
+uv venv --python 3.13
+uv pip install -r requirements-lock.txt -e '.[dev]'
+export KIMI_CODE_API_KEY='<your key>'
+bash scripts/demo.sh
 ```
 
-Press **Run a check** in the UI. RedTape scans the document ledger, re-reads the sandbox portal's versioned rules, computes the backward-chained plan, books a valid appointment, pre-fills the application (JSON + a reviewable PDF draft, watermarked **DRAFT — NOT SUBMITTED**), places calendar holds — and if a choice is irreversible or costs money, it stops and asks you in the **Decision Inbox**.
+Open http://localhost:9200 and press **Run agent check**. Inspect the generated decision and approve the exact displayed option. The local sandbox is at http://localhost:9100/docs. The script pins product and sandbox clocks to September 11, 2026; persona data is synthetic. It preserves existing local data, so use a fresh clone for the initial judge scenario. Close the two demo servers when finished.
 
-![The dashboard: document chain, backward-chained timeline, and a decision that needs you](assets/dashboard.png)
+Model calls use the configured external provider and can take several minutes. The recorded run required a resumed follow-through; it is not an instant-response claim. See [recorded demonstration](docs/recorded-demo.md) and [testing instructions](docs/testing.md).
 
-The demo environment (`mockgov/`) simulates the consulate/DMV portal so the whole loop runs offline and deterministically. The agent's reasoning, document parsing, form pre-fill, guardrails, and decision flow are real; the portal client is the only simulated piece, isolated behind one interface.
+## What is real
 
-## What makes it an agent, not a reminder
+| Component | Status |
+| --- | --- |
+| Strands agent, tool selection, LLM steering and session persistence | Implemented; genuine hosted model exercised in the recorded case |
+| Backward date planner, deterministic booking/submission guards, Decision Inbox and hash-chained SQLite ledger | Implemented and tested locally |
+| Draft JSON/PDF and calendar holds | Real local artifacts; no government submission |
+| Xiao's documents, rules, appointments and government portal | Synthetic shipped mockgov sandbox |
+| Default model | Configured Kimi endpoint; requested and returned ID kimi-for-coding |
+| Bedrock provider and AgentCore entry point | Code paths present; deployment not demonstrated |
+| Live agency connectors, real-user outcomes and public hosted app | Not demonstrated |
 
-- **Dependency-graph planning** — deadlines are computed backwards from *when the document must be in hand*, through processing time and appointment lead, not forwards from an expiry date. Cross-renewal conflicts (passport surrendered while the license renewal needs it) are detected explicitly.
-- **Background by design** — a daemon wakes the agent on a schedule or on triggers; there is no chat to babysit. After each wake the daemon verifies the cycle reached a terminal state (a booking landed, or a decision is pending/executed, or the plan required nothing) and nudges the agent once if it ended early — an empty model finish can't silently stall the chain.
-- **Deterministic guardrails** — Strands **hooks** cancel any booking that lands after the graph-computed safe date, and cancel any application submission not explicitly approved by you; an approved decision unlocks exactly the slots it names (even when the model buries the slot id in prose). Watch the hook fire in the Activity feed.
-- **A steering buddy** — Strands' `LLMSteeringHandler` reviews each tool call against natural-language operating rules and guides the agent back when it drifts. RedTape subclasses it to degrade "interrupt for human" decisions into guidance: a background agent must never suspend mid-turn waiting for a human — the Decision Inbox is the only human-input channel.
-- **Auditable everything** — every action lands in a hash-chained ledger you can verify (`verify_ledger()`); sessions persist across restarts via `SnapshotSessionManager`. The store runs in WAL mode with serialized access, so the web server, daemon, and CLI checks can share one database without starving each other's writes.
-- **Photo intake** — point a camera at a document; the vision model extracts the fields, you confirm, the agent takes it from there. (The photo is sent to the configured vision provider — Kimi in the demo — and stored locally until you delete it; nothing is trusted until you confirm.)
+On September 12, a real Strands run completed the same-case chain: model-selected work → blocked late slot → concrete decision → exact synthetic operator approval → matching sandbox receipt CNF-B1000. All nine outcome checks passed after a persisted-session continuation. This is one scenario, not a claim that every model call or the entire scenario suite passed. [Sanitized proof and source hashes](docs/demo-proof.json).
 
-## Architecture
+The 128-second English submission film reflects this genuine run. [Current transcript and shot plan](video/script.md). Public video hosting and the Devpost entry are managed separately; this repository does not claim an uploaded URL before it exists.
 
-![architecture](docs/architecture.png)
+## Permission boundaries
 
-```
-scheduler ── wakes ──▶ Strands agent ──▶ tools: documents · rules · plans · booking · forms · calendar
-                           │  ▲                     guardrail hooks cancel unsafe calls before they run
-                           │  └── steering buddy reviews every tool call
-                           ▼
-                    Decision Inbox (the only interruption)  ·  hash-chained action ledger
-```
+The model proposes actions. Deterministic code owns date calculations and hard permissions.
 
-## Evaluation
+Booking binds slot, office, service, document, jurisdiction and confirmation state. A slot outside the plan's safe date requires approval covering that exact slot. The UI displays actual generated alternatives and derives receipt values from the matching approval and booking.
 
-`python -m evals.run` (with the sandbox portal running on :9100) drives **10 scripted scenarios** against a **fresh, isolated state per scenario** — a temp SQLite store, a reset sandbox (slots, bookings, and rules restored to shipped versions), and a pinned clock — and asserts on **outcome state**, not model prose: exact booking counts with office/service/slot binding, exactly-once execution after a human resolves a decision, no booking at all when the best slot is taken until a human approves a choice, no double-booking on a duplicate trigger, adaptation when a rule version changes mid-run, a strict side-effect allowlist per scenario, and zero unauthorized submissions. Latest report (with run provenance: commit SHA, provider/model, SDK version, clock): `evals/reports/last-run.json`.
+Application submission requires an exact displayed approval: approve=true, document, jurisdiction, canonical pipeline draft path, mandatory SHA256 and matching draft provenance. SQLite atomically consumes one approval for at most one dispatch attempt. A failed request does not silently re-authorize it; this is not exactly-once delivery by a government agency. No application was filed in the recorded demo.
 
-A deterministic **attack matrix** (`tests/test_guardrails.py`) calls the guardrail hooks directly — no model in the loop — and cancels: wrong-office/service bookings, bookings with no plan authorization, submissions without an approved decision (asserting the block is *logged*, not just absent), and reused approvals. Safety claims come from these two layers together, not from the agent behaving during a demo.
+## Verify without a hosted model
 
 ```bash
-python -m evals.run            # full suite → evals/reports/last-run.json
-python -m evals.run quick      # the 3 fastest scenarios
+# Terminal 1
+MOCKGOV_TODAY=2026-09-11 .venv/bin/python -m uvicorn mockgov.app:app --host 127.0.0.1 --port 9100
+
+# Terminal 2
+MOCKGOV_BASE=http://127.0.0.1:9100 REDTAPE_TODAY=2026-09-11 \
+  .venv/bin/python -m pytest tests/ -q
+node tests/ui-display.test.mjs
 ```
 
-Set `EVAL_CLOCK=2026-09-11` to pin the planning date regardless of the host date (by default the suite uses the sandbox's own `TODAY`).
+The Python tests cover dates, concurrent ledger writes, sandbox isolation, exact displayed options, draft/hash provenance and atomic approval consumption. The JavaScript test guards against index-based fabricated alternative labels and mismatched receipt fields.
 
-## Current status
+`python -m evals.run quick` and `python -m evals.run` are separate hosted-model evaluations and require credentials. The tracked evals/reports/last-run.json is a historical nine-scenario artifact, not current-release certification. No new full hosted matrix is claimed.
 
-| Claim | Status |
-|---|---|
-| Background wake → plan → safe work → one human decision → execute | **Implemented** (sandbox) |
-| Guardrail hooks: date bound, action binding (office/service/doc), submission approval with one-time nonce | **Implemented** — attack matrix in `tests/test_guardrails.py` |
-| Eval suite (10 scenarios) + attack matrix (5 direct attacks) | **Implemented** — latest numbers in `evals/reports/last-run.json`, bound to the run's commit SHA |
-| Government portal | **Simulated** — `mockgov/` ships with the repo; rule payloads carry the real source URLs they were modeled on |
-| Real consulate/DMV integration, real submissions | **Planned** — portal client is isolated behind one interface |
-| AgentCore deployment / live demo | **Planned** — provider path wired (`REDTAPE_PROVIDER=bedrock`), not deployed |
-| Photo intake privacy (retention/redaction policy) | **Partially implemented** — raw file removed on document delete; vision extraction disclosed in the upload endpoint |
-| Real-user impact evidence | **NOT_RUN** |
-| Eligibility self-declaration, public video upload, Devpost submission | **PAUSED-HUMAN** |
+## Configuration and privacy
 
-## Configuration
+- KIMI_CODE_API_KEY: default text model and optional photo-intake credential.
+- REDTAPE_PROVIDER: kimi by default; bedrock is a compatible alternate path.
+- REDTAPE_MODEL_ID: kimi-for-coding by default for the Kimi provider.
+- MOCKGOV_BASE: localhost:9100 by default.
+- MOCKGOV_TODAY / REDTAPE_TODAY: both pinned by the demo script.
 
-| env var | default | purpose |
-|---|---|---|
-| `KIMI_CODE_API_KEY` | — | model key (dev/demo default: Kimi K2.7) |
-| `REDTAPE_PROVIDER` | `kimi` | `kimi` or `bedrock` (AgentCore path) |
-| `REDTAPE_MODEL_ID` | `kimi-for-coding` | model override |
-| `MOCKGOV_TODAY` | `2026-09-11` | the sandbox's "today" — pin it to keep demo dates stable |
-| `REDTAPE_TODAY` | host date | the web app's and daemon's "today" — set it to match `MOCKGOV_TODAY` so every surface plans against the same day |
-| `EVAL_CLOCK` | sandbox `TODAY` | the eval suite's planning date |
+Photo intake sends the selected image to Kimi's vision endpoint and retains a local raw upload until its document is deleted. Use the shipped synthetic persona or manual entry for judging. A different text provider does not automatically change photo intake. Keep credentials and personal documents out of Git; generated state is ignored.
 
-Note on providers: the agent loop works with any Strands-supported text model (the provider is one env var away), but **photo intake currently calls Kimi's vision endpoint directly** — with another provider, document entry falls back to manual form entry. The `bedrock` provider path is wired but the AgentCore deployment is optional and not part of this repo's local demo. `requirements-lock.txt` records the exact dependency set the tests and evals were last verified against.
+## Source map
 
-## License
+- redtape/agent.py — Strands assembly, operating prompt and LLM steering.
+- redtape/domain.py — deterministic backward planning.
+- redtape/plugins/guardrails.py — action-bound permission hooks.
+- redtape/store.py — documents, decisions, atomic approval use and ledger.
+- redtape/server.py and static/index.html — product surface.
+- mockgov/ — versioned rules and local government sandbox.
+- docs/architecture.svg — editable architecture source.
 
-MIT — see [LICENSE](LICENSE).
+MIT licensed. See [LICENSE](LICENSE).

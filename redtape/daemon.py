@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from datetime import date
 from pathlib import Path
@@ -18,7 +19,7 @@ from .paths import DATA_DIR
 from .store import Store
 from .tools import init_context
 
-MOCKGOV_BASE = "http://localhost:9100"
+MOCKGOV_BASE = os.environ.get("MOCKGOV_BASE", "http://localhost:9100").rstrip("/")
 
 NUDGE = (
     "Protocol check: this wake had an active trigger, but the cycle ended with "
